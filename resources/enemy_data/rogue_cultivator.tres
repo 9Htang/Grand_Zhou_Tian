@@ -1,0 +1,36 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://resources/enemy_data.gd" id="1"]
+[ext_resource type="Script" path="res://resources/enemy_action_data.gd" id="2"]
+
+[sub_resource type="Resource" id="EnemyActionData_attack"]
+script = ExtResource("2")
+intent = 0
+damage = 8
+weight = 2
+
+[sub_resource type="Resource" id="EnemyActionData_drain"]
+script = ExtResource("2")
+intent = 7
+damage = 3
+debuff_player = "energy_down:1"
+weight = 2
+
+[sub_resource type="Resource" id="EnemyActionData_defend"]
+script = ExtResource("2")
+intent = 2
+block = 6
+weight = 1
+
+[resource]
+script = ExtResource("1")
+id = "rogue_cultivator"
+display_name = "散修"
+max_hp = 26
+realm = 1
+element = "水"
+actions = Array[ExtResource("2")]([SubResource("EnemyActionData_attack"), SubResource("EnemyActionData_drain"), SubResource("EnemyActionData_defend")])
+action_count = 1
+reward_gold = 12
+reward_cultivation = 22
+texture_color = Color(0.2, 0.3, 0.7, 1)

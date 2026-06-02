@@ -1,0 +1,40 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://resources/enemy_data.gd" id="1"]
+
+[sub_resource type="Resource" id="EnemyActionData_heavy"]
+script = ExtResource("1")
+intent = 0
+damage = 14
+weight = 2
+
+[sub_resource type="Resource" id="EnemyActionData_multi"]
+script = ExtResource("1")
+intent = 1
+damage = 5
+weight = 2
+
+[sub_resource type="Resource" id="EnemyActionData_seal"]
+script = ExtResource("1")
+intent = 5
+target_node = "random"
+weight = 2
+
+[sub_resource type="Resource" id="EnemyActionData_buff"]
+script = ExtResource("1")
+intent = 3
+buff_self = "strength:3"
+weight = 1
+
+[resource]
+script = ExtResource("1")
+id = "boss_elder"
+display_name = "执事长老"
+max_hp = 55
+realm = 2
+element = "火"
+actions = Array[ExtResource("1")]([SubResource("EnemyActionData_heavy"), SubResource("EnemyActionData_multi"), SubResource("EnemyActionData_seal"), SubResource("EnemyActionData_buff")])
+action_count = 1
+reward_gold = 30
+reward_cultivation = 60
+texture_color = Color(0.8, 0.2, 0.2, 1)

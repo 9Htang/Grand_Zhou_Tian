@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/card_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "flying_sword"
+display_name = "飞剑术"
+card_type = 0
+rarity = 1
+cost = 2
+target_type = 1
+description = "造成 12 点伤害"
+damage = 12
+upgrade_damage_bonus = 4
+flavor_text = "以气御剑，千里取敌首"

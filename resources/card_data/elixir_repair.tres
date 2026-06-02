@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/card_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "elixir_repair"
+display_name = "续脉膏"
+card_type = 6
+rarity = 1
+cost = 0
+target_type = 0
+description = "修复全部受损经脉"
+elixir_use_location = 1
+elixir_effect = "repair_all"
+flavor_text = "断脉重续，枯木逢春"

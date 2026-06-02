@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="TechniqueData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/technique_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "longevity_sutra"
+display_name = "长生经"
+description = "木系功法，生生不息。攻防均衡，擅长恢复与持久战。"
+element = "木"
+qi_per_step = 1
+qi_return_rate = 0.85
+node_reactions = {
+"火": "attack_up:2",
+"水": "heal:2",
+"木": "energy_up:1",
+"金": "",
+"土": "block:2"
+}
+attack_multiplier = 1.1
+defense_multiplier = 1.1
+attack_bonus = ""
+defense_bonus = ""

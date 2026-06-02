@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/card_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "elixir_heal"
+display_name = "回气丹"
+card_type = 6
+rarity = 0
+cost = 1
+target_type = 3
+description = "战斗中恢复 15 点生命"
+elixir_use_location = 0
+elixir_effect = "heal:15"
+heal = 15
+flavor_text = "一粒回气，百病不生"

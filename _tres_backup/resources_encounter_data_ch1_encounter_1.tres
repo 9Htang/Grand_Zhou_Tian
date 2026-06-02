@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="EncounterData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/encounter_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "ch1_encounter_1"
+encounter_type = 0
+enemy_ids = Array[String](["wild_wolf"])
+reward_card_pool = Array[String](["attack_basic", "defense_basic", "healing_breeze", "flying_sword"])
+gold_reward = 10
+cultivation_reward = 15
+artifact_drop_chance = 0.0

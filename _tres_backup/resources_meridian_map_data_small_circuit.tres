@@ -1,0 +1,59 @@
+[gd_resource type="Resource" script_class="MeridianMapData" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://resources/meridian_map_data.gd" id="1"]
+
+[sub_resource type="Resource" id="MeridianNodeData_node0"]
+script = ExtResource("1")
+name = "丹田"
+element = ""
+position = Vector2(0.5, 0.85)
+connections = Array[int]([1])
+unlocked = true
+
+[sub_resource type="Resource" id="MeridianNodeData_node1"]
+script = ExtResource("1")
+name = "气海穴"
+element = "水"
+position = Vector2(0.5, 0.72)
+connections = Array[int]([2])
+unlocked = true
+
+[sub_resource type="Resource" id="MeridianNodeData_node2"]
+script = ExtResource("1")
+name = "命门穴"
+element = "火"
+position = Vector2(0.35, 0.58)
+connections = Array[int]([3])
+unlocked = true
+
+[sub_resource type="Resource" id="MeridianNodeData_node3"]
+script = ExtResource("1")
+name = "神阙穴"
+element = "土"
+position = Vector2(0.2, 0.45)
+connections = Array[int]([4])
+unlocked = true
+
+[sub_resource type="Resource" id="MeridianNodeData_node4"]
+script = ExtResource("1")
+name = "膻中穴"
+element = "金"
+position = Vector2(0.35, 0.32)
+connections = Array[int]([5])
+unlocked = true
+
+[sub_resource type="Resource" id="MeridianNodeData_node5"]
+script = ExtResource("1")
+name = "印堂穴"
+element = "木"
+position = Vector2(0.5, 0.2)
+connections = Array[int]([])
+unlocked = true
+
+[resource]
+script = ExtResource("1")
+id = "small_circuit"
+display_name = "小周天经脉"
+is_circular = false
+dantian_node_index = 0
+nodes = Array[ExtResource("1")]([SubResource("MeridianNodeData_node0"), SubResource("MeridianNodeData_node1"), SubResource("MeridianNodeData_node2"), SubResource("MeridianNodeData_node3"), SubResource("MeridianNodeData_node4"), SubResource("MeridianNodeData_node5")])

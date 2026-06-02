@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="EncounterData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/encounter_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "ch1_boss"
+encounter_type = 2
+enemy_ids = Array[String](["boss_elder"])
+reward_card_pool = Array[String](["flying_sword", "golden_shield", "technique_fire_heart", "technique_void_step"])
+gold_reward = 30
+cultivation_reward = 60
+artifact_drop_chance = 1.0

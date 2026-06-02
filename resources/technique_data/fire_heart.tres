@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="TechniqueData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/technique_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "fire_heart"
+display_name = "烈火诀"
+description = "以火为引，焚尽八荒。高爆发但防御薄弱，火/木穴位收益极高，水/金穴位有反噬风险。"
+element = "火"
+qi_per_step = 1
+qi_return_rate = 0.7
+node_reactions = {
+"火": "attack_up:3",
+"水": "energy_down:1",
+"木": "burn:2",
+"金": "self_damage:1",
+"土": ""
+}
+attack_multiplier = 1.5
+defense_multiplier = 0.7
+attack_bonus = "burn:2"
+defense_bonus = ""

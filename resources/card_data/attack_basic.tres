@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/card_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "attack_basic"
+display_name = "基础剑诀"
+card_type = 0
+rarity = 0
+cost = 1
+target_type = 1
+description = "造成 6 点伤害"
+damage = 6
+upgrade_damage_bonus = 3
+flavor_text = "剑修入门，无招胜有招"

@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/card_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "qi_gathering"
+display_name = "吐纳术"
+card_type = 5
+rarity = 0
+cost = 0
+target_type = 0
+description = "下回合额外获得 2 点灵气"
+qi_gather_amount = 2
+flavor_text = "一呼一吸，天地灵气尽入丹田"

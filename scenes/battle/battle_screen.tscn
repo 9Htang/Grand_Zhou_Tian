@@ -1,0 +1,9 @@
+[gd_scene format=3 uid="uid://34a15iouyv1n"]
+
+[ext_resource type="Script" uid="uid://c6xs1hvcu64px" path="res://scenes/battle/battle_screen.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/battle_test/battle_test.tscn" id="2_g0k2o"]
+
+[node name="BattleScreen" type="CanvasLayer" unique_id=1364740407]
+script = ExtResource("1")
+
+[node name="BattleTest" parent="." unique_id=115961869 instance=ExtResource("2_g0k2o")]

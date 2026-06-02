@@ -1,0 +1,10 @@
+[gd_scene format=3 uid="uid://dh7dl3lk2qjfd"]
+
+[ext_resource type="Script" uid="uid://boxwbxa8b3hq7" path="res://scenes/event/event_screen.gd" id="1_xmssf"]
+
+[node name="EventScreen" type="Control" unique_id=318781649]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_xmssf")

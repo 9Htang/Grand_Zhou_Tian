@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/card_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "elixir_breakthrough"
+display_name = "破障丹"
+card_type = 6
+rarity = 2
+cost = 0
+target_type = 0
+description = "解锁 1 个随机穴位"
+elixir_use_location = 1
+elixir_effect = "unlock_node:random"
+flavor_text = "冲破桎梏，更上层楼"

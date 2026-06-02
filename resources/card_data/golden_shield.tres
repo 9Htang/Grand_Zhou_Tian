@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/card_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "golden_shield"
+display_name = "金光罩"
+card_type = 1
+rarity = 1
+cost = 2
+target_type = 3
+description = "获得 10 点格挡"
+block = 10
+upgrade_block_bonus = 4
+flavor_text = "金钟不倒，万邪不侵"

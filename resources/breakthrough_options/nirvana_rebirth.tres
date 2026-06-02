@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="BreakthroughOptionData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/breakthrough_option_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "nirvana_rebirth"
+display_name = "涅槃重生"
+description = "焚尽残躯，于灰烬中重生。生命力大幅提升。"
+weight = 1
+min_realm = 2
+effects = Array[String](["heal:999", "max_hp_up:30"])
+risks = Array[String](["qi_restore:-999"])

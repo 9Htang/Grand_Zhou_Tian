@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/card_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "healing_breeze"
+display_name = "回春术"
+card_type = 2
+rarity = 1
+cost = 1
+target_type = 3
+description = "恢复 7 点生命"
+heal = 7
+flavor_text = "枯木逢春，生机再现"

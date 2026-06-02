@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="BreakthroughOptionData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/breakthrough_option_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "ancient_legacy"
+display_name = "上古传承"
+description = "感应到上古修士留下的法宝气息…"
+weight = 1
+min_realm = 1
+effects = Array[String](["gain_artifact:random"])
+risks = Array[String](["talent_up:-1"])

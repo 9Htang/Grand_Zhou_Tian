@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/card_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "technique_void_step"
+display_name = "太虚步"
+card_type = 4
+rarity = 1
+cost = 2
+target_type = 0
+description = "激活太虚步功法。水属性，灵活万金油。"
+technique_id = "void_step"
+flavor_text = "上善若水，无形无相"

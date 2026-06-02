@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="BreakthroughOptionData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/breakthrough_option_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "heavenly_insight"
+display_name = "天道感悟"
+description = "窥见天道一角，天资飞跃。但天地不容，引来强敌。"
+weight = 1
+min_realm = 2
+effects = Array[String](["talent_up:2", "dantian_up:5"])
+risks = Array[String](["buff:enemy_strength:3"])

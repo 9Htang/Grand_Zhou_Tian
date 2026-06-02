@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="EncounterData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/encounter_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "ch1_encounter_2"
+encounter_type = 0
+enemy_ids = Array[String](["rogue_cultivator"])
+reward_card_pool = Array[String](["attack_basic", "defense_basic", "golden_shield", "qi_gathering"])
+gold_reward = 12
+cultivation_reward = 20
+artifact_drop_chance = 0.0

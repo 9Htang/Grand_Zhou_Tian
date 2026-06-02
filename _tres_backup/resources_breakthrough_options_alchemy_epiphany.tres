@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="BreakthroughOptionData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/breakthrough_option_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "alchemy_epiphany"
+display_name = "丹道顿悟"
+description = "脑中闪过丹方奥义，获得珍贵丹药。"
+weight = 3
+min_realm = 1
+effects = Array[String](["gain_elixir:elixir_heal", "gain_elixir:elixir_repair"])
+risks = Array[String]([])

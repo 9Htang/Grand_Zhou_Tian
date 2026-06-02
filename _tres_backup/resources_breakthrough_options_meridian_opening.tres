@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="BreakthroughOptionData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/breakthrough_option_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "meridian_opening"
+display_name = "灵脉贯通"
+description = "以灵气冲击经脉，解锁沉睡的穴位，但可能损伤经脉。"
+weight = 3
+min_realm = 1
+effects = Array[String](["unlock_node:random", "unlock_node:random"])
+risks = Array[String](["repair_path:random:1"])

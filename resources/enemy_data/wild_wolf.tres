@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://resources/enemy_data.gd" id="1"]
+[ext_resource type="Script" path="res://resources/enemy_action_data.gd" id="2"]
+
+[sub_resource type="Resource" id="EnemyActionData_attack"]
+script = ExtResource("2")
+intent = 0
+damage = 6
+weight = 3
+
+[sub_resource type="Resource" id="EnemyActionData_buff"]
+script = ExtResource("2")
+intent = 3
+buff_self = "strength:2"
+weight = 1
+
+[sub_resource type="Resource" id="EnemyActionData_defend"]
+script = ExtResource("2")
+intent = 2
+block = 5
+weight = 2
+
+[resource]
+script = ExtResource("1")
+id = "wild_wolf"
+display_name = "妖狼"
+max_hp = 20
+realm = 1
+element = "木"
+actions = Array[ExtResource("2")]([SubResource("EnemyActionData_attack"), SubResource("EnemyActionData_defend"), SubResource("EnemyActionData_buff")])
+action_count = 1
+reward_gold = 8
+reward_cultivation = 15
+texture_color = Color(0.3, 0.5, 0.3, 1)

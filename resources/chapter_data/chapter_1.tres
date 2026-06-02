@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ChapterData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/chapter_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "chapter_1"
+display_name = "第一章·山林试炼"
+chapter_index = 1
+story_intro = "你是一名初入道途的散修，孤身踏入苍茫山林。\n\n妖兽横行，危机四伏。唯有以心法御气，方能于这乱世中争得一线生机。\n\n前方，便是你的第一道试炼……"
+story_outro = "执事长老倒下的瞬间，你感受到一股磅礴的灵气涌入丹田。\n\n境界的壁垒开始松动，是时候突破了。\n\n前路漫漫，大道朝天。"
+encounter_ids = Array[String](["ch1_encounter_1", "ch1_encounter_2"])
+boss_encounter_id = "ch1_boss"
