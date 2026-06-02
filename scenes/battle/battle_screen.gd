@@ -1,6 +1,12 @@
+# ============================================================
+# 大周天 — BattleScreen (战斗 UI 壳)
+# ============================================================
+# 职责: UI构建、刷新、输入事件、sandbox
+# 逻辑委托给 BattleController，状态管理委托给 EnemyStatusSystem
+# ============================================================
 extends CanvasLayer
 
-@onready var fsm: BattleStateMachine
+# === UI Nodes ===
 @onready var enemy_container: HBoxContainer
 @onready var meridian_panel: Panel
 @onready var technique_area: HBoxContainer
@@ -13,24 +19,39 @@ extends CanvasLayer
 @onready var deck_info: Label
 @onready var turn_label: Label
 
-var deck_manager: DeckManager
-var current_encounter: EncounterData
-var enemies: Array[EnemyActor] = []
-var current_target: int = 0
+# === Battle Controller (流程编排) ===
+var controller: BattleController
+
+# === Core References ===
+var player_actor: PlayerActor
+var deck_manager: DeckManager  # shortcut for UI queries
+var fsm: BattleStateMachine
+
+# === State ===
 var _animating: bool = false
 var sandbox_panel: CanvasLayer
 var _sandbox_enabled: bool = false  # 设为 true 开启调试面板（` 键呼出）
 
 var _dragged_card: CardData = null
 var _is_technique_highlighted: bool = false
-var _last_collision = null  # QiCollisionResolver.CollisionResult — for meridian view
 
-var player_actor: PlayerActor
+# Backward-compatible proxies for CardEffects (expects Node with .enemies + .get_target_enemy())
+var enemies: Array[EnemyActor]:
+	get: return controller.enemies
 
-# Shortcut to player actor for system calls
+
+func get_target_enemy() -> EnemyActor:
+	return controller.get_target_enemy()
+
+
+# Shortcut to player actor for backward-compatible system calls
 func _gm() -> Node:
 	return player_actor
 
+
+# ============================================================
+# Ready
+# ============================================================
 
 func _ready() -> void:
 	add_to_group("battle_screen")
@@ -39,7 +60,9 @@ func _ready() -> void:
 	player_actor = PlayerActor.new()
 	player_actor.name = "PlayerActor"
 	add_child(player_actor)
-	_populate_player_actor()
+	player_actor.load_from_gm()
+	# Ensure meridian starts clean
+	_reset_meridian_for_battle()
 
 	_build_layout()
 
@@ -52,63 +75,57 @@ func _ready() -> void:
 		sandbox_panel.init(self)
 		add_child(sandbox_panel)
 
+	# Create controller (orchestrates turn flow + system calls)
+	controller = BattleController.new()
+	controller.initialize(self, player_actor, fsm)
+
 	_connect_signals()
 	_start_battle()
 
 
-func _populate_player_actor() -> void:
-	player_actor.hp = GameManager.player_hp
-	player_actor.max_hp = GameManager.player_max_hp
-	player_actor.dantian_qi = GameManager.dantian_qi
-	player_actor.dantian_capacity = GameManager.dantian_capacity
-	player_actor.qi_gather_rate = GameManager.qi_gather_rate
-	player_actor.dantian_pressure = GameManager.dantian_pressure
-	player_actor.current_block = GameManager.current_block
-	player_actor.realm = GameManager.realm
-	player_actor.talent = GameManager.talent
-	player_actor.active_techniques = GameManager.active_techniques.duplicate()
-	player_actor.active_buffs = GameManager.active_buffs.duplicate()
-	player_actor.base_meridian = GameManager.base_meridian
-	# Ensure meridian starts clean — reset node states in case shared Resource was polluted
-	_reset_meridian_for_battle()
-	player_actor.active_circuits = GameManager.active_circuits.duplicate()
-	player_actor.erosion_targets = GameManager.erosion_targets.duplicate()
-	player_actor.erosion_bonuses = GameManager.erosion_bonuses.duplicate()
-	player_actor.qi_gather_bonuses = GameManager.qi_gather_bonuses.duplicate()
-	player_actor.is_flow_dry = GameManager.is_flow_dry
-	player_actor.node_base_buffs = GameManager.node_base_buffs.duplicate()
-	player_actor.damaged_pathways = GameManager.damaged_pathways.duplicate()
-	player_actor.gold = GameManager.gold
-	player_actor.cultivation = GameManager.cultivation
-	player_actor.cultivation_to_next = GameManager.cultivation_to_next
-	player_actor.master_deck = GameManager.master_deck.duplicate()
+# ============================================================
+# Battle Start
+# ============================================================
+
+func _start_battle() -> void:
+	if not controller.start_battle():
+		return
+
+	deck_manager = controller.deck_manager
+	_spawn_enemies()
+
+	_update_all_ui()
+
+	fsm.transition_to(BattleStateMachine.BattleState.PRE_BATTLE)
+	await get_tree().create_timer(0.3).timeout
+	fsm.transition_to(BattleStateMachine.BattleState.TURN_START)
 
 
-func _sync_player_back_to_gm() -> void:
-	GameManager.player_hp = player_actor.hp
-	GameManager.player_max_hp = player_actor.max_hp
-	GameManager.dantian_qi = player_actor.dantian_qi
-	GameManager.dantian_capacity = player_actor.dantian_capacity
-	GameManager.qi_gather_rate = player_actor.qi_gather_rate
-	GameManager.dantian_pressure = player_actor.dantian_pressure
-	GameManager.current_block = player_actor.current_block
-	GameManager.realm = player_actor.realm
-	GameManager.talent = player_actor.talent
-	GameManager.active_techniques = player_actor.active_techniques.duplicate()
-	GameManager.active_buffs = player_actor.active_buffs.duplicate()
-	GameManager.base_meridian = player_actor.base_meridian
-	GameManager.active_circuits = player_actor.active_circuits.duplicate()
-	GameManager.erosion_targets = player_actor.erosion_targets.duplicate()
-	GameManager.erosion_bonuses = player_actor.erosion_bonuses.duplicate()
-	GameManager.qi_gather_bonuses = player_actor.qi_gather_bonuses.duplicate()
-	GameManager.is_flow_dry = player_actor.is_flow_dry
-	GameManager.node_base_buffs = player_actor.node_base_buffs.duplicate()
-	GameManager.damaged_pathways = player_actor.damaged_pathways.duplicate()
-	GameManager.gold = player_actor.gold
-	GameManager.cultivation = player_actor.cultivation
-	GameManager.cultivation_to_next = player_actor.cultivation_to_next
-	GameManager.master_deck = player_actor.master_deck.duplicate()
+func _load_encounter() -> EncounterData:
+	# Delegated to controller — kept here only for _spawn_enemies reference
+	return controller.current_encounter
 
+
+func _spawn_enemies() -> void:
+	for child in enemy_container.get_children():
+		enemy_container.remove_child(child)
+		child.queue_free()
+	controller.enemies.clear()
+
+	for enemy_id: String in controller.current_encounter.enemy_ids:
+		var data: EnemyData = EnemyDatabase.get_enemy(enemy_id)
+		if data == null:
+			continue
+		var display: Control = _create_enemy_display(data)
+		enemy_container.add_child(display)
+		var actor: EnemyActor = display.get_meta("actor")
+		if actor:
+			controller.enemies.append(actor)
+
+
+# ============================================================
+# Layout / UI Construction
+# ============================================================
 
 func _build_layout() -> void:
 	# === Adaptive sizing (viewport-relative) ===
@@ -119,15 +136,11 @@ func _build_layout() -> void:
 	var buffs_h: int = UIHelpers.pct_h(UIHelpers.BUFFS_PCT, self)
 	var player_h: int = UIHelpers.pct_h(UIHelpers.PLAYER_AREA_PCT, self)
 	var hand_h: int = UIHelpers.pct_h(UIHelpers.HAND_AREA_PCT, self)
-	var btn_h: int = max(28, int(float(hand_h) * 0.15))  # end turn button ~15% of hand area
-	var card_sz: Vector2 = UIHelpers.card_size(self)
-	var tech_card_sz: Vector2 = UIHelpers.tech_card_size(self)
-	var hp_bar_w: int = UIHelpers.pct_w(0.11, self)   # ~140/1280
+	var btn_h: int = max(28, int(float(hand_h) * 0.15))
+	var hp_bar_w: int = UIHelpers.pct_w(0.11, self)
 	var hp_bar_h: int = max(16, int(float(player_h) * 0.7))
-	var meridian_panel_w: int = UIHelpers.pct_w(0.55, self)  # enough for 9-node graph
+	var meridian_panel_w: int = UIHelpers.pct_w(0.55, self)
 	var meridian_panel_h: int = max(140, meridian_h - 20)
-	var enemy_panel_w: int = UIHelpers.pct_w(0.11, self)
-	var enemy_panel_h: int = enemy_h - 10
 	var sandbox_btn_sz: Vector2 = Vector2(float(max(24, int(float(top_h) * 0.8))), float(top_h))
 
 	# Root control fills the screen
@@ -135,20 +148,21 @@ func _build_layout() -> void:
 	root.name = "Layout"
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
 
-	# Background ambiance (ink-wash + floating qi particles)
+	# Background ambiance
 	var ambiance_sc: GDScript = load("res://ui_components/background_ambiance.gd") as GDScript
 	var ambiance := Control.new()
 	ambiance.set_script(ambiance_sc)
 	ambiance.name = "BackgroundAmbiance"
 	root.add_child(ambiance)
 
-	# Main VBox layout on top of background
+	# Main VBox layout
 	var vbox := VBoxContainer.new()
 	vbox.name = "MainVBox"
 	vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.add_child(vbox)
 	add_child(root)
 
+	# === Top Bar ===
 	var top := HBoxContainer.new()
 	top.name = "TopBar"
 	top.custom_minimum_size.y = top_h
@@ -172,6 +186,7 @@ func _build_layout() -> void:
 
 	vbox.add_child(top)
 
+	# === Enemy Area ===
 	var enemy_area := MarginContainer.new()
 	enemy_area.name = "EnemyArea"
 	enemy_area.custom_minimum_size.y = enemy_h
@@ -181,10 +196,10 @@ func _build_layout() -> void:
 	enemy_area.add_child(enemy_container)
 	vbox.add_child(enemy_area)
 
+	# === Meridian Area ===
 	var meridian_area := MarginContainer.new()
 	meridian_area.name = "MeridianArea"
 	meridian_area.custom_minimum_size.y = meridian_h
-	# Use the new meridian view component
 	meridian_panel = Panel.new()
 	meridian_panel.name = "MeridianPanel"
 	meridian_panel.custom_minimum_size = Vector2(float(meridian_panel_w), float(meridian_panel_h))
@@ -193,6 +208,7 @@ func _build_layout() -> void:
 	meridian_area.add_child(meridian_panel)
 	vbox.add_child(meridian_area)
 
+	# === Technique Area ===
 	var tech_area := MarginContainer.new()
 	tech_area.name = "TechniqueArea"
 	tech_area.custom_minimum_size.y = tech_h
@@ -209,6 +225,7 @@ func _build_layout() -> void:
 	tech_area.add_child(technique_area)
 	vbox.add_child(tech_area)
 
+	# === Buffs Bar ===
 	var buffs := MarginContainer.new()
 	buffs.name = "BuffsBar"
 	buffs.custom_minimum_size.y = buffs_h
@@ -220,6 +237,7 @@ func _build_layout() -> void:
 	buffs.add_child(buffs_bar)
 	vbox.add_child(buffs)
 
+	# === Player Area ===
 	var player_area := HBoxContainer.new()
 	player_area.name = "PlayerArea"
 	player_area.custom_minimum_size.y = player_h
@@ -242,6 +260,7 @@ func _build_layout() -> void:
 	player_area.add_child(deck_info)
 	vbox.add_child(player_area)
 
+	# === Hand Area ===
 	var hand_area_container := MarginContainer.new()
 	hand_area_container.name = "HandArea"
 	hand_area_container.custom_minimum_size.y = hand_h
@@ -298,6 +317,68 @@ func _create_qi_bar(w: int, h: int) -> Control:
 	return bar
 
 
+func _create_enemy_display(data: EnemyData) -> Control:
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(float(UIHelpers.pct_w(0.11, self)), float(UIHelpers.pct_h(0.18, self)))
+
+	var vbox := VBoxContainer.new()
+	panel.add_child(vbox)
+
+	var sprite := ColorRect.new()
+	sprite.color = data.texture_color
+	var sprite_sz: int = UIHelpers.pct_h(0.083, self)
+	sprite.custom_minimum_size = Vector2(float(sprite_sz), float(sprite_sz))
+	vbox.add_child(sprite)
+
+	var name_label := Label.new()
+	name_label.text = data.display_name
+	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	name_label.add_theme_color_override("font_color", GameColors.TEXT_PRIMARY)
+	name_label.add_theme_font_size_override("font_size", UIHelpers.scale_font(13, self))
+	vbox.add_child(name_label)
+
+	var hp := PanelContainer.new()
+	hp.name = "EnemyHP"
+	hp.custom_minimum_size = Vector2(float(UIHelpers.pct_w(0.094, self)), float(UIHelpers.pct_h(0.019, self)))
+	var hp_sc: GDScript = load("res://ui_components/health_bar.gd") as GDScript
+	hp.set_script(hp_sc)
+	hp.max_value = data.max_hp
+	hp.current_value = data.max_hp
+	vbox.add_child(hp)
+
+	var block_label := Label.new()
+	block_label.name = "EnemyBlock"
+	block_label.text = ""
+	block_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	block_label.add_theme_font_size_override("font_size", UIHelpers.pct_h(UIHelpers.FONT_TINY_PCT, self))
+	block_label.add_theme_color_override("font_color", GameColors.ACCENT_CERULEAN)
+	vbox.add_child(block_label)
+
+	var status_label := Label.new()
+	status_label.name = "EnemyStatus"
+	status_label.text = ""
+	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	status_label.add_theme_font_size_override("font_size", UIHelpers.pct_h(UIHelpers.FONT_TINY_PCT, self))
+	status_label.add_theme_color_override("font_color", GameColors.ACCENT_CERULEAN)
+	status_label.visible = false
+	vbox.add_child(status_label)
+
+	panel.set_meta("enemy_data", data)
+
+	var enemy_actor := EnemyActor.new()
+	enemy_actor.name = "EnemyActor_" + data.display_name
+	enemy_actor.initialize_from_data(data)
+	panel.add_child(enemy_actor)
+	panel.set_meta("actor", enemy_actor)
+
+	panel.gui_input.connect(_on_enemy_clicked.bind(panel))
+	return panel
+
+
+# ============================================================
+# Signal Connections
+# ============================================================
+
 func _connect_signals() -> void:
 	fsm.state_changed.connect(_on_state_changed)
 	fsm.turn_start.connect(_on_turn_start)
@@ -318,206 +399,101 @@ func _connect_signals() -> void:
 	player_actor.technique_deactivated.connect(_on_technique_changed)
 
 
-func _start_battle() -> void:
-	current_encounter = _load_encounter()
-	if current_encounter == null:
-		return
-
-	deck_manager = DeckManager.new()
-	deck_manager.initialize(player_actor.master_deck.duplicate())
-
-	_spawn_enemies()
-	_update_all_ui()
-
-	fsm.transition_to(BattleStateMachine.BattleState.PRE_BATTLE)
-	await get_tree().create_timer(0.3).timeout
-	fsm.transition_to(BattleStateMachine.BattleState.TURN_START)
-
-
-func _load_encounter() -> EncounterData:
-	# Get encounter from current map node
-	var chapter: ChapterData = GameManager.current_chapter_data
-	var enc_id: String = "ch1_encounter_1"  # fallback
-	if chapter != null:
-		var node_idx: int = GameManager.current_map_node_index
-		if node_idx >= 0 and node_idx < chapter.map_nodes.size():
-			var node = chapter.map_nodes[node_idx]
-			if not node.encounter_id.is_empty():
-				enc_id = node.encounter_id
-	var path: String = "res://resources/encounter_data/" + enc_id + ".tres"
-	if ResourceLoader.exists(path):
-		return load(path) as EncounterData
-	return null
-
-
-func _spawn_enemies() -> void:
-	for child in enemy_container.get_children():
-		enemy_container.remove_child(child)
-		child.queue_free()
-	enemies.clear()
-
-	for enemy_id: String in current_encounter.enemy_ids:
-		var data: EnemyData = EnemyDatabase.get_enemy(enemy_id)
-		if data == null:
-			continue
-		var display: Control = _create_enemy_display(data)
-		enemy_container.add_child(display)
-		# Store EnemyActor reference; the visual wrapper is in the container
-		var actor: EnemyActor = display.get_meta("actor")
-		if actor:
-			enemies.append(actor)
-
-
-func _create_enemy_display(data: EnemyData) -> Control:
-	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(float(UIHelpers.pct_w(0.11, self)), float(UIHelpers.pct_h(0.18, self)))
-
-	var vbox := VBoxContainer.new()
-	panel.add_child(vbox)
-
-	var sprite := ColorRect.new()
-	sprite.color = data.texture_color
-	var sprite_sz: int = UIHelpers.pct_h(0.083, self)  # ~60/720
-	sprite.custom_minimum_size = Vector2(float(sprite_sz), float(sprite_sz))
-	vbox.add_child(sprite)
-
-	var name_label := Label.new()
-	name_label.text = data.display_name
-	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	name_label.add_theme_color_override("font_color", GameColors.TEXT_PRIMARY)
-	name_label.add_theme_font_size_override("font_size", UIHelpers.scale_font(13, self))
-	vbox.add_child(name_label)
-
-	var hp := PanelContainer.new()
-	hp.name = "EnemyHP"
-	hp.custom_minimum_size = Vector2(float(UIHelpers.pct_w(0.094, self)), float(UIHelpers.pct_h(0.019, self)))
-	var hp_sc: GDScript = load("res://ui_components/health_bar.gd") as GDScript
-	hp.set_script(hp_sc)
-	hp.max_value = data.max_hp
-	hp.current_value = data.max_hp
-	vbox.add_child(hp)
-
-	# Block indicator
-	var block_label := Label.new()
-	block_label.name = "EnemyBlock"
-	block_label.text = ""
-	block_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	block_label.add_theme_font_size_override("font_size", UIHelpers.pct_h(UIHelpers.FONT_TINY_PCT, self))
-	block_label.add_theme_color_override("font_color", GameColors.ACCENT_CERULEAN)
-	vbox.add_child(block_label)
-
-	# Status indicator
-	var status_label := Label.new()
-	status_label.name = "EnemyStatus"
-	status_label.text = ""
-	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	status_label.add_theme_font_size_override("font_size", UIHelpers.pct_h(UIHelpers.FONT_TINY_PCT, self))
-	status_label.add_theme_color_override("font_color", GameColors.ACCENT_CERULEAN)
-	status_label.visible = false
-	vbox.add_child(status_label)
-
-	panel.set_meta("enemy_data", data)
-
-	# Create EnemyActor and attach to panel
-	var enemy_actor := EnemyActor.new()
-	enemy_actor.name = "EnemyActor_" + data.display_name
-	enemy_actor.initialize_from_data(data)
-	panel.add_child(enemy_actor)
-	panel.set_meta("actor", enemy_actor)
-
-	panel.gui_input.connect(_on_enemy_clicked.bind(panel))
-	return panel
-
-
 # ============================================================
-# FSM Handlers
+# FSM Handlers (thin wrappers — logic in BattleController)
 # ============================================================
 
 func _on_state_changed(_from: int, to: int) -> void:
 	turn_label.text = "阶段: " + fsm.get_state_name(to)
 
 
-func _on_qi_circulation() -> void:
-	_animating = true
-	_run_qi_circulation()
-	# Bug 1 fix: display collision descriptions to player
-	if _last_collision and not _last_collision.descriptions.is_empty():
-		turn_label.text = "碰撞: " + ", ".join(_last_collision.descriptions)
-	_animating = false
-	fsm.transition_to(BattleStateMachine.BattleState.ENEMY_TURN)
-
-
 func _on_turn_start() -> void:
-	# Gather phase: dantian absorbs qi from environment/techniques
-	# Erosion targets persist across turns until nodes unlock
-	var gm: Node = _gm()
-	QiPoolManager.gather_passive(gm)
-	# 被动法宝轮询（按序执行，灵气不够则跳过）
-	ArtifactManager.poll_passive(gm, GameManager.turn_count)
-	ArtifactManager.on_turn_start(gm, GameManager.turn_count)
-	# 充能型法宝每回合同步积蓄灵气
-	ArtifactManager.charge_artifacts(gm, player_actor.qi_gather_rate)
+	controller.execute_turn_start()
 	_update_all_ui()
-	fsm.transition_to(BattleStateMachine.BattleState.PLAYER_TURN)
 
 
 func _on_player_turn() -> void:
-	# 应用抽牌惩罚后的有效抽牌数
-	var effective_draw: int = deck_manager.get_effective_draw_count(5)
-	deck_manager.draw_to_hand_size(effective_draw)
-	deck_manager.clear_draw_penalty()
-
-	# Node property: extra draw
-	var extra_draw: float = NodePropertyResolver.get_active_property_total(_gm(), "extra_draw")
-	if extra_draw > 0:
-		deck_manager.draw_cards(int(extra_draw))
-
+	controller.execute_player_turn()
 	_refresh_hand_ui()
 	_update_all_ui()
-	fsm.transition_to(BattleStateMachine.BattleState.PLAYER_ACTION)
+
+
+func _on_qi_circulation() -> void:
+	_animating = true
+	var log_text: String = controller.execute_qi_circulation()
+	if not log_text.is_empty():
+		turn_label.text = log_text
+	_refresh_meridian_panel()
+	_animating = false
+	# Transition handled by controller (now at ENEMY_TURN)
 
 
 func _on_enemy_turn() -> void:
-	var actions_log: String = _execute_enemy_turn()
+	var actions_log: String = controller.execute_enemy_turn()
 	turn_label.text = "敌人行动: " + actions_log
 	_update_all_ui()
+	# Refresh all enemy displays
+	for enemy in controller.enemies:
+		_refresh_enemy_display(enemy, enemy_container)
 	fsm.transition_to(BattleStateMachine.BattleState.ENEMY_ACTION)
 	await get_tree().create_timer(1.0).timeout
 	fsm.transition_to(BattleStateMachine.BattleState.ENEMY_QI_CIRCULATION)
 
 
 func _on_enemy_qi_circulation() -> void:
-	for enemy_panel in enemies:
-		var actor: EnemyActor = enemy_panel
-		if actor == null:
-			continue
-		if actor.active_techniques.is_empty() or actor.base_meridian == null:
-			continue
-		# Auto-select erosion targets for the enemy
-		if actor.erosion_targets.is_empty():
-			EnemyAI.select_erosion_targets(actor)
-		_run_qi_circulation_for_actor(actor)
-	fsm.transition_to(BattleStateMachine.BattleState.TURN_END)
+	controller.execute_enemy_qi_circulation()
+
+
+func _on_turn_end() -> void:
+	var result: Dictionary = controller.execute_turn_end()
+	var state: String = result.get("state", "continue")
+
+	if state == "won":
+		return  # BATTLE_WON transition already done by controller
+	if state == "lost":
+		return  # BATTLE_LOST transition already done by controller
+
+	# Process enemy statuses at turn end (UI-coupled: needs _refresh_enemy_display)
+	var status_log: String = EnemyStatusSystem.tick_all(controller.enemies)
+	# Guard: if battle ended during status processing, stop
+	if fsm.current_state == BattleStateMachine.BattleState.BATTLE_WON or fsm.current_state == BattleStateMachine.BattleState.BATTLE_LOST:
+		return
+	if not status_log.is_empty():
+		turn_label.text = "状态: " + status_log
+
+	# Consume pending effects
+	var pending: Array = result.get("pending_effects", [])
+	for effect in pending:
+		match effect["type"]:
+			"burn":
+				for enemy in controller.enemies:
+					EnemyStatusSystem.apply(enemy, "burn:" + str(effect["value"]) + ":2")
+					_refresh_enemy_display(enemy, enemy_container)
+			"draw_card":
+				_refresh_hand_ui()
+
+	# Refresh enemy displays after status processing
+	for enemy in controller.enemies:
+		_refresh_enemy_display(enemy, enemy_container)
+
+	# Check for dead enemies from status processing
+	_check_battle_end_display()
+
+	_update_all_ui()
+	# FSM transition to TURN_START happens here — after ALL turn-end processing is done
+	fsm.transition_to(BattleStateMachine.BattleState.TURN_START)
 
 
 func _on_battle_won() -> void:
-	_sync_player_back_to_gm()
-	GameManager.add_cultivation(current_encounter.cultivation_reward)
-	GameManager.gold += current_encounter.gold_reward
-	# Check if it was a boss node
-	var chapter: ChapterData = GameManager.current_chapter_data
-	if chapter != null:
-		var current_idx: int = GameManager.current_map_node_index
-		if current_idx >= 0 and current_idx < chapter.map_nodes.size():
-			var node = chapter.map_nodes[current_idx]
-			if node.node_type == 5:  # MapNodeData.NodeType.BOSS
-				SceneManager.go_to_reward()  # Boss -> reward screen -> next chapter
-				return
-	SceneManager.go_to_map()  # Normal battle -> back to map
+	var result: Dictionary = controller.execute_battle_won()
+	if result.get("is_boss", false):
+		SceneManager.go_to_reward()
+	else:
+		SceneManager.go_to_map()
 
 
 func _on_battle_lost() -> void:
-	_sync_player_back_to_gm()
+	controller.execute_battle_lost()
 	SceneManager.go_to_game_over(false)
 
 
@@ -527,338 +503,32 @@ func _on_end_turn() -> void:
 	fsm.transition_to(BattleStateMachine.BattleState.QI_CIRCULATION)
 
 
-func _on_turn_end() -> void:
-	# Check battle end conditions, then advance to next turn
-	if player_actor.hp <= 0:
-		fsm.transition_to(BattleStateMachine.BattleState.BATTLE_LOST)
-		return
-	var all_dead := true
-	for enemy in enemies:
-		if enemy.hp > 0:
-			all_dead = false
-			break
-	if all_dead:
-		fsm.transition_to(BattleStateMachine.BattleState.BATTLE_WON)
-		return
-
-	# Tick meridian damage timers (Bug 4 fix: damage duration countdown)
-	MeridianDamageSystem.tick_damage_timers(player_actor)
-	for enemy in enemies:
-		MeridianDamageSystem.tick_damage_timers(enemy)
-
-	# Clear card buffs (technique buffs persist across turns)
-	player_actor.clear_card_buffs()
-	player_actor.current_block = 0
-
-	# Process enemy status effects (burn tick / debuff countdown)
-	var status_log: String = process_enemy_statuses()
-	# Guard: if battle ended during status processing, stop turn-end logic
-	if fsm.current_state == fsm.BattleState.BATTLE_WON or fsm.current_state == fsm.BattleState.BATTLE_LOST:
-		return
-	if not status_log.is_empty():
-		turn_label.text = "状态: " + status_log
-
-	# Consume pending effects (from EffectResolver / elixirs / breakthroughs)
-	var pending: Array = _gm().get_meta("pending_effects", [])
-	for effect in pending:
-		match effect["type"]:
-			"burn":
-				for enemy in enemies:
-					add_enemy_status(enemy, "burn:" + str(effect["value"]) + ":2")
-			"draw_card":
-				deck_manager.draw_cards(effect["value"])
-				_refresh_hand_ui()
-	_gm().set_meta("pending_effects", [])
-
-	deck_manager.discard_hand()
-	_update_all_ui()
-	fsm.transition_to(BattleStateMachine.BattleState.TURN_START)
-
-
 # ============================================================
-# Qi Circulation
-# ============================================================
-
-func _run_qi_circulation() -> void:
-	_run_qi_circulation_for_actor(player_actor)
-	_refresh_meridian_panel()
-
-
-func _run_qi_circulation_for_actor(actor: CombatActor) -> void:
-	var meridian: MeridianMapData = actor.base_meridian
-	if meridian == null:
-		return
-
-	var techniques: Array = actor.active_techniques
-
-	# 灵气持久流动 — 不清零！回路中的灵气跨回合保持
-	# 只清理断流无回路时的微量残留
-	if actor.active_circuits.is_empty() and actor.dantian_qi <= 0:
-		QiFlowSystem.clear_flow_state(actor)
-
-	# 流量追踪：累积每个穴位本回合流经的灵气量，用于 buff 生成
-	var flow_tracker: Dictionary = {}
-
-	# Fluid tick loop: inject -> propagate -> erode -> deliver
-	const MAX_TICKS: int = 20
-	for _i in range(MAX_TICKS):
-		var tick_result: Dictionary = QiFlowSystem.tick(actor, flow_tracker)
-		var new_circuits: Array = tick_result.get("circuits_formed", [])
-		if not new_circuits.is_empty():
-			for circuit in new_circuits:
-				actor.circuit_formed.emit(circuit)
-		# Unlock visual feedback (player only)
-		var unlocked_names: Array = tick_result.get("nodes_unlocked", [])
-		if not unlocked_names.is_empty() and actor is PlayerActor:
-			for node_name in unlocked_names:
-				for j: int in meridian.nodes.size():
-					var mn: MeridianNodeData = meridian.nodes[j]
-					if mn and mn.name == node_name and meridian_panel.has_method("notify_node_unlocked"):
-						meridian_panel.notify_node_unlocked(j)
-						break
-		if tick_result.get("is_dry", false):
-			break
-		if not tick_result.get("flow_moved", false):
-			break
-
-	actor.is_flow_dry = QiPoolManager.get_remaining(actor) <= 0
-
-	# Collect active nodes
-	var active_nodes: Array[int] = []
-	for i: int in meridian.nodes.size():
-		var node: MeridianNodeData = meridian.get_node(i)
-		if node and node.current_qi > 0 and node.unlocked and not node.blocked:
-			active_nodes.append(i)
-
-	# Collision resolution
-	var collision = null
-	if techniques.size() >= 2 and not active_nodes.is_empty():
-		collision = QiCollisionResolver.resolve_all(techniques, active_nodes, meridian)
-		for dmg in collision.damaged_pathways:
-			MeridianDamageSystem.damage_pathway(actor, dmg["from"], dmg["to"], dmg.get("turns", 3))
-
-	# Save collision for meridian view (player only)
-	if actor is PlayerActor:
-		_last_collision = collision
-
-	# Buff generation (linear scaling)
-	actor.clear_technique_buffs()
-	var all_buffs: Array = TechniqueResolver.resolve_network_buffs(
-		techniques, meridian, actor.node_base_buffs, collision, flow_tracker
-	)
-	actor.active_buffs = all_buffs
-
-	# Consume generated buffs
-	for buff in all_buffs:
-		match buff.name:
-			"burn":
-				# Player-originated burn applies to enemies
-				if actor is PlayerActor:
-					for enemy in enemies:
-						add_enemy_status(enemy, "burn:" + str(buff.value) + ":2")
-			"draw_card":
-				if actor is PlayerActor:
-					deck_manager.draw_cards(buff.value)
-					_refresh_hand_ui()
-			"heal":
-				actor.heal(buff.value)
-			"block":
-				actor.current_block += buff.value
-			"energy_up":
-				actor.add_qi(buff.value)
-			"energy_down":
-				actor.spend_qi(buff.value)
-			"self_damage":
-				actor.take_damage(buff.value)
-
-	ArtifactManager.on_qi_circulate(actor)
-
-
-# ============================================================
-# Enemy Turn
-# ============================================================
-
-func _execute_enemy_turn() -> String:
-	var log_entries: Array[String] = []
-	for enemy in enemies:
-		var actor: EnemyActor = enemy
-		if actor == null:
-			continue
-		var data: EnemyData = null
-		# Find the visual panel that has enemy_data meta
-		for child in enemy_container.get_children():
-			var panel_data: EnemyData = child.get_meta("enemy_data")
-			if panel_data and child.get_meta("actor") == actor:
-				data = panel_data
-				break
-		if data == null:
-			continue
-
-		var action: EnemyActionData = EnemyAI.select_action(actor, player_actor, data)
-		if action == null:
-			continue
-
-		log_entries.append(EnemyAI.describe_decision(actor, action))
-
-		# Check for weak status on enemy (reduces damage dealt)
-		var weak_amount: int = 0
-		if actor.statuses.has("weak"):
-			weak_amount = actor.statuses["weak"].get("amount", 0)
-
-		match action.intent:
-			EnemyActionData.IntentType.ATTACK, EnemyActionData.IntentType.ATTACK_MULTI:
-				# Enemy strength bonus
-				var raw_dmg: int = action.damage + actor.strength
-				var dmg: int = DamageCalculation.enemy_damage(
-					raw_dmg, player_actor.realm, actor.realm
-				)
-				# Player vulnerable: damage x1.5
-				for buff in player_actor.active_buffs:
-					if buff.name == "vulnerable":
-						dmg = int(float(dmg) * 1.5)
-						break
-				# Enemy weak: damage -N
-				dmg = max(0, dmg - weak_amount)
-				player_actor.take_damage(dmg)
-				log_entries.append(actor.display_name + " 攻击造成 " + str(dmg) + " 伤害")
-
-				# Node property: counter
-				var counter_val: float = NodePropertyResolver.get_active_property_total(_gm(), "counter")
-				if counter_val > 0.0:
-					var new_hp: int = max(0, actor.hp - int(counter_val))
-					actor.hp = new_hp
-					log_entries.append(" 反击 " + str(int(counter_val)))
-
-				# Node property: reflect
-				var reflect_pct: float = NodePropertyResolver.get_active_property_total(_gm(), "reflect")
-				if reflect_pct > 0.0:
-					var reflect_dmg: int = max(1, int(float(dmg) * reflect_pct / 100.0))
-					actor.hp = max(0, actor.hp - reflect_dmg)
-					log_entries.append(" 反伤 " + str(reflect_dmg))
-
-			EnemyActionData.IntentType.DEFEND:
-				actor.current_block += action.block
-				log_entries.append(actor.display_name + " 防御 +" + str(action.block))
-
-			EnemyActionData.IntentType.BUFF_SELF:
-				if not action.buff_self.is_empty():
-					var parts: PackedStringArray = action.buff_self.split(":")
-					if parts.size() >= 2:
-						match parts[0]:
-							"strength":
-								actor.strength += int(parts[1])
-								log_entries.append(actor.display_name + " 力量 +" + parts[1])
-							_:
-								log_entries.append(actor.display_name + " 强化")
-				else:
-					log_entries.append(actor.display_name + " 强化")
-
-			EnemyActionData.IntentType.DEBUFF_PLAYER:
-				if not action.debuff_player.is_empty():
-					var parts: PackedStringArray = action.debuff_player.split(":")
-					if parts.size() >= 2:
-						match parts[0]:
-							"weak":
-								var rb := TechniqueResolver.ResolvedBuff.new()
-								rb.name = "weak"
-								rb.value = int(parts[1])
-								rb.source = "enemy"
-								player_actor.active_buffs.append(rb)
-								player_actor.buffs_updated.emit(player_actor.active_buffs)
-								log_entries.append(actor.display_name + " 虚弱玩家 (-" + parts[1] + " 伤害)")
-							"energy_down":
-								player_actor.spend_qi(int(parts[1]))
-								log_entries.append(actor.display_name + " 吸取灵气 " + parts[1])
-							_:
-								log_entries.append(actor.display_name + " 削弱玩家")
-				else:
-					log_entries.append(actor.display_name + " 削弱玩家")
-
-			EnemyActionData.IntentType.SEAL_MERIDIAN:
-				var target_node_idx: int = -1
-				if action.target_node == "random":
-					var candidates: Array[int] = []
-					var mer: MeridianMapData = player_actor.base_meridian
-					if mer:
-						for i: int in mer.nodes.size():
-							var n: MeridianNodeData = mer.get_node(i)
-							if n and n.unlocked and not n.blocked and n.current_qi > 0:
-								candidates.append(i)
-					if not candidates.is_empty():
-						target_node_idx = candidates[randi() % candidates.size()]
-				if target_node_idx >= 0:
-					var mn: MeridianNodeData = player_actor.base_meridian.get_node(target_node_idx)
-					MeridianDamageSystem.block_node(player_actor, mn.name)
-					log_entries.append(actor.display_name + " 封穴 " + mn.name)
-				else:
-					log_entries.append(actor.display_name + " 封穴 (无有效目标)")
-
-			EnemyActionData.IntentType.DAMAGE_PATHWAY:
-				var pathways: Array = player_actor.base_meridian.pathways
-				if not pathways.is_empty():
-					var pw = pathways[randi() % pathways.size()]
-					MeridianDamageSystem.damage_pathway(player_actor, pw.from_node, pw.to_node)
-					log_entries.append(actor.display_name + " 断脉 " + str(pw.from_node) + "->" + str(pw.to_node))
-				else:
-					log_entries.append(actor.display_name + " 断脉 (无经脉)")
-
-			EnemyActionData.IntentType.DRAIN_QI:
-				var drain_amount: int = action.damage
-				if drain_amount <= 0:
-					drain_amount = 3
-				var actual: float = QiFlowSystem.draw_from_meridian(player_actor, float(drain_amount))
-				log_entries.append(actor.display_name + " 吸灵 " + str(int(actual)) + " 点")
-				if not action.debuff_player.is_empty():
-					var parts: PackedStringArray = action.debuff_player.split(":")
-					if parts.size() >= 2 and parts[0] == "energy_down":
-						player_actor.spend_qi(int(parts[1]))
-
-			_:
-				log_entries.append(actor.display_name + " " + EnemyIntents.get_intent_text(action))
-
-		_refresh_enemy_display(actor, enemy_container)
-
-	if log_entries.is_empty():
-		return "无"
-	return ", ".join(log_entries)
-
-
-# ============================================================
-# Card Play
+# Card Play / Drag (UI input → controller delegation)
 # ============================================================
 
 func _on_card_clicked(card_data: CardData) -> void:
 	if _animating:
 		return
 
-	var gm: Node = _gm()
-	var result: Dictionary = CardEffects.apply(gm, card_data, self)
+	var result: Dictionary = controller.play_card(card_data)
 
-	if not result.get("success", false):
+	if not result.get("played", false):
 		return
 
-	# 根据行为标记路由卡牌去向
-	var destination: String = result.get("destination", "discard")
-	match destination:
-		"discard":
-			deck_manager.play_card(card_data)
-		"exhaust":
-			deck_manager.exhaust_card(card_data)
-		_:
-			pass
+	# 功法卡进入路径选择模式 → 高亮可用起点，等待穴位点击
+	if result.get("awaiting_pathway", false):
+		_highlight_available_start_nodes()
+		turn_label.text = "选择经脉路径: 先点击起点穴位"
+		return
 
-	# 容器展开：内容物卡牌加入手牌
-	var container_cards: Array = result.get("container_cards", [])
-	for cc: CardData in container_cards:
-		deck_manager.hand.append(cc)
-
-	# 刷新 UI
-	var target: EnemyActor = get_target_enemy()
+	# UI refresh
+	var target: EnemyActor = controller.get_target_enemy()
 	if target:
 		_refresh_enemy_display(target, enemy_container)
 	_refresh_hand_ui()
 	_update_all_ui()
-	_check_battle_end()
+	_check_battle_end_display()
 
 
 func _on_card_drag_started(card_data: CardData) -> void:
@@ -874,14 +544,8 @@ func _on_card_drag_ended(card_data: CardData, _drop_area: String) -> void:
 	var tech_parent: MarginContainer = technique_area.get_parent() as MarginContainer
 	if tech_parent and tech_parent.get_global_rect().has_point(mouse_pos):
 		if card_data.card_type == CardData.CardType.TECHNIQUE:
-			# 通过 CardEffects 统一处理功法激活
-			var result: Dictionary = CardEffects.apply(_gm(), card_data, self)
+			var result: Dictionary = controller.activate_technique_via_card(card_data)
 			if result.get("success", false):
-				var dest: String = result.get("destination", "discard")
-				if dest == "exhaust":
-					deck_manager.exhaust_card(card_data)
-				else:
-					deck_manager.play_card(card_data)
 				_refresh_hand_ui()
 				_update_all_ui()
 		handled = true
@@ -896,7 +560,7 @@ func _on_card_drag_ended(card_data: CardData, _drop_area: String) -> void:
 				_refresh_hand_ui()
 			handled = true
 
-	# 3. Invalid drop - snap back by refreshing hand layout
+	# 3. Invalid drop - snap back
 	if not handled:
 		_refresh_hand_ui()
 
@@ -909,22 +573,35 @@ func _on_technique_changed(_tech: TechniqueData) -> void:
 
 func _on_technique_clicked(event: InputEvent, tech: TechniqueData) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		# 检查是否有剩余抽牌配额
-		if not deck_manager.can_cancel(5):
-			return
-		player_actor.deactivate_technique(tech)
-		# 将功法卡返还手牌
-		var card_id: String = "technique_" + tech.id
-		var card: CardData = CardDatabase.get_card(card_id)
-		if card:
-			deck_manager.cancel_technique(card)
-		_refresh_hand_ui()
-		_update_all_ui()
+		if controller.cancel_technique(tech):
+			_refresh_hand_ui()
+			_update_all_ui()
 
 
-# Single click acupoint -> show info popup (dedup: remove existing first)
+# ============================================================
+# Meridian Interaction
+# ============================================================
+
+## Single click acupoint → pathway selection OR info popup
 func _on_node_info(idx: int, node: MeridianNodeData) -> void:
-	# Remove any existing popup before creating a new one
+	# 功法路径选择模式下 → 节点点击 = 选路径
+	if controller.pending_technique_card != null:
+		var sel_result: int = controller.select_pathway_node(idx)
+		match sel_result:
+			-1:  # 无效选择
+				pass
+			0:   # 已选起点，等待终点
+				_highlight_available_end_nodes()
+				turn_label.text = "选择经脉路径: 再点击终点穴位"
+			1:   # 完成绑定
+				_clear_pathway_highlights()
+				turn_label.text = "功法已挂载"
+				_refresh_hand_ui()
+				_refresh_technique_area()
+				_update_all_ui()
+		return
+
+	# 正常模式 → 显示穴位信息弹窗
 	for child in get_children():
 		if child is CanvasLayer and child.name.begins_with("NodeInfo_"):
 			child.queue_free()
@@ -936,7 +613,7 @@ func _on_node_info(idx: int, node: MeridianNodeData) -> void:
 	popup.show_info(idx, node)
 
 
-# Double click acupoint -> toggle erosion target (locked nodes with adjacent unlocked only)
+## Double click acupoint → toggle erosion target
 func _on_erosion_toggle(idx: int, node: MeridianNodeData) -> void:
 	if node.unlocked:
 		return
@@ -954,8 +631,46 @@ func _on_erosion_toggle(idx: int, node: MeridianNodeData) -> void:
 	_refresh_meridian_panel()
 
 
+## Called by BattleController when a node unlocks during qi circulation
+func notify_node_unlocked(idx: int) -> void:
+	if meridian_panel and meridian_panel.has_method("notify_node_unlocked"):
+		meridian_panel.notify_node_unlocked(idx)
+
+
+## 高亮所有可用的起点穴位（丹田邻接、已解锁、未阻塞）
+func _highlight_available_start_nodes() -> void:
+	if not meridian_panel or not meridian_panel.has_method("set_pathway_highlights"):
+		return
+	var nodes: Array[int] = player_actor.get_dantian_adjacent_nodes()
+	meridian_panel.set_pathway_highlights(nodes, [])  # 起点高亮，终点无
+
+
+## 高亮所有可用的终点穴位（除起点外的任意已解锁穴位）
+func _highlight_available_end_nodes() -> void:
+	if not meridian_panel or not meridian_panel.has_method("set_pathway_highlights"):
+		return
+	var from_idx: int = controller.pathway_selection_from
+	if from_idx < 0:
+		return
+	var mer: MeridianMapData = player_actor.base_meridian
+	if mer == null:
+		return
+	var end_nodes: Array[int] = []
+	for i: int in mer.nodes.size():
+		var node: MeridianNodeData = mer.nodes[i]
+		if node and node.unlocked and not node.blocked and i != from_idx:
+			end_nodes.append(i)
+	meridian_panel.set_pathway_highlights([from_idx], end_nodes)
+
+
+## 清除所有路径选择高亮
+func _clear_pathway_highlights() -> void:
+	if meridian_panel and meridian_panel.has_method("clear_pathway_highlights"):
+		meridian_panel.clear_pathway_highlights()
+
+
 # ============================================================
-# UI Updates
+# UI Refresh
 # ============================================================
 
 func _update_all_ui() -> void:
@@ -963,7 +678,8 @@ func _update_all_ui() -> void:
 	_update_qi(player_actor.dantian_qi, player_actor.dantian_capacity)
 	_update_buffs(player_actor.active_buffs)
 	realm_label.text = "境界: " + str(player_actor.realm)
-	deck_info.text = "牌库:" + str(deck_manager.get_draw_pile_count()) + " 弃牌:" + str(deck_manager.get_discard_count())
+	if deck_manager:
+		deck_info.text = "牌库:" + str(deck_manager.get_draw_pile_count()) + " 弃牌:" + str(deck_manager.get_discard_count())
 	_refresh_technique_area()
 	_refresh_meridian_panel()
 
@@ -995,6 +711,8 @@ func _update_buffs(buffs: Array) -> void:
 
 
 func _refresh_hand_ui() -> void:
+	if deck_manager == null:
+		return
 	for child in hand_area.get_children():
 		hand_area.remove_child(child)
 		child.queue_free()
@@ -1078,132 +796,27 @@ func _refresh_meridian_panel() -> void:
 		if meridian_panel.has_method("set_dry"):
 			meridian_panel.set_dry(player_actor.is_flow_dry)
 
-		# Pass technique colors for per-technique visualization
+		# Pass technique colors
 		var tech_colors: Dictionary = {}
 		for tech in player_actor.active_techniques:
 			tech_colors[tech.id] = Helpers.color_for_element(tech.get_element_int())
 		if meridian_panel.has_method("set_technique_colors"):
 			meridian_panel.set_technique_colors(tech_colors)
 
-		# Pass collision data for 相生/相克 visualization
-		if meridian_panel.has_method("set_collision_data") and _last_collision != null:
-			meridian_panel.set_collision_data(_last_collision)
+		# Pass collision data (now stored on controller)
+		# Pass technique pathway bindings
+			if meridian_panel.has_method("set_technique_pathways"):
+				var pathway_data: Dictionary = {}
+				for tech_id in player_actor.technique_pathways:
+					var binding: Dictionary = player_actor.technique_pathways[tech_id]
+					var key: String = str(binding.get("from", -1)) + "->" + str(binding.get("to", -1))
+					if not pathway_data.has(key):
+						pathway_data[key] = []
+					pathway_data[key].append(tech_id)
+				meridian_panel.set_technique_pathways(pathway_data)
 
-
-# ============================================================
-# Helpers
-# ============================================================
-
-func _on_enemy_clicked(event: InputEvent, panel: PanelContainer) -> void:
-	if event is InputEventMouseButton and event.pressed:
-		var actor: EnemyActor = panel.get_meta("actor")
-		if actor == null:
-			return
-		var idx: int = enemies.find(actor)
-		if idx >= 0:
-			current_target = idx
-
-
-func get_target_enemy() -> EnemyActor:
-	if enemies.is_empty():
-		return null
-	if current_target >= enemies.size():
-		current_target = 0
-	return enemies[current_target]
-
-
-# ============================================================
-# Enemy Status System (debuff/burn/vulnerable/weak)
-# ============================================================
-
-# Apply a status effect to an enemy
-# status_str: "burn:3:2" (damage:3, turns:2), "vulnerable:2" (turns:2), "weak:1:2"
-func add_enemy_status(enemy: EnemyActor, status_str: String) -> void:
-	var parts: PackedStringArray = status_str.split(":")
-	if parts.size() < 2:
-		return
-	var name: String = parts[0]
-
-	match name:
-		"burn":
-			var damage: int = int(parts[1])
-			var turns: int = int(parts[2]) if parts.size() >= 3 else 2
-			if enemy.statuses.has("burn"):
-				var existing: Dictionary = enemy.statuses["burn"]
-				existing["damage"] = max(existing["damage"], damage)
-				existing["turns"] = max(existing["turns"], turns)
-			else:
-				enemy.statuses["burn"] = {"damage": damage, "turns": turns}
-		"vulnerable":
-			var turns: int = int(parts[1])
-			var existing_turns: int = enemy.statuses.get("vulnerable", {}).get("turns", 0)
-			enemy.statuses["vulnerable"] = {"turns": max(existing_turns, turns)}
-		"weak":
-			var amount: int = int(parts[1])
-			var turns: int = int(parts[2]) if parts.size() >= 3 else 1
-			var existing_turns: int = enemy.statuses.get("weak", {}).get("turns", 0)
-			var existing_amount: int = enemy.statuses.get("weak", {}).get("amount", 0)
-			enemy.statuses["weak"] = {"amount": max(existing_amount, amount), "turns": max(existing_turns, turns)}
-
-	_refresh_enemy_display(enemy, enemy_container)
-
-
-# Process all enemy statuses at turn end (burn tick / debuff countdown)
-# Returns log string
-func process_enemy_statuses() -> String:
-	var log_entries: Array[String] = []
-	for enemy in enemies:
-		if enemy.statuses.is_empty():
-			continue
-		var hp: int = enemy.hp
-		var name_str: String = enemy.display_name
-
-		# Burn tick
-		if enemy.statuses.has("burn"):
-			var burn: Dictionary = enemy.statuses["burn"]
-			var dmg: int = burn["damage"]
-			hp = max(0, hp - dmg)
-			burn["turns"] = burn["turns"] - 1
-			log_entries.append(name_str + " 灼烧 " + str(dmg) + " 点")
-			if burn["turns"] <= 0:
-				enemy.statuses.erase("burn")
-
-		# Vulnerable countdown
-		if enemy.statuses.has("vulnerable"):
-			var vuln: Dictionary = enemy.statuses["vulnerable"]
-			vuln["turns"] = vuln["turns"] - 1
-			if vuln["turns"] <= 0:
-				enemy.statuses.erase("vulnerable")
-
-		# Weak countdown
-		if enemy.statuses.has("weak"):
-			var weak: Dictionary = enemy.statuses["weak"]
-			weak["turns"] = weak["turns"] - 1
-			if weak["turns"] <= 0:
-				enemy.statuses.erase("weak")
-
-		enemy.hp = hp
-		_refresh_enemy_display(enemy, enemy_container)
-
-		# Remove dead enemies — check battle end and return early if decided
-		if hp <= 0:
-			_check_battle_end()
-			if fsm.current_state == fsm.BattleState.BATTLE_WON or fsm.current_state == fsm.BattleState.BATTLE_LOST:
-				return ", ".join(log_entries)
-
-	return ", ".join(log_entries)
-
-
-# Check if enemy has a specific status
-func enemy_has_status(enemy: EnemyActor, status_name: String) -> bool:
-	return enemy.statuses.has(status_name)
-
-
-# Get status value
-func get_enemy_status_value(enemy: EnemyActor, status_name: String, key: String = "damage", default: Variant = 0):
-	if enemy.statuses.has(status_name):
-		return enemy.statuses[status_name].get(key, default)
-	return default
+			if meridian_panel.has_method("set_collision_data") and controller._last_collision != null:
+				meridian_panel.set_collision_data(controller._last_collision)
 
 
 func _refresh_enemy_display(actor: EnemyActor, container: Node) -> void:
@@ -1211,7 +824,6 @@ func _refresh_enemy_display(actor: EnemyActor, container: Node) -> void:
 	var current_block: int = actor.current_block
 	var statuses: Dictionary = actor.statuses
 
-	# Find the visual panel for this actor
 	for child in container.get_children():
 		var panel_actor: EnemyActor = child.get_meta("actor")
 		if panel_actor != actor:
@@ -1244,13 +856,26 @@ func _refresh_enemy_display(actor: EnemyActor, container: Node) -> void:
 		break
 
 
+# ============================================================
+# Helpers
+# ============================================================
+
+func _on_enemy_clicked(event: InputEvent, panel: PanelContainer) -> void:
+	if event is InputEventMouseButton and event.pressed:
+		var actor: EnemyActor = panel.get_meta("actor")
+		if actor == null:
+			return
+		var idx: int = controller.enemies.find(actor)
+		if idx >= 0:
+			controller.current_target = idx
+
+
 func draw_cards(count: int) -> void:
-	deck_manager.draw_cards(count)
-	_refresh_hand_ui()
+	if deck_manager:
+		deck_manager.draw_cards(count)
+		_refresh_hand_ui()
 
 
-# Reset meridian nodes to default state (only dantian unlocked) before battle
-# Prevents battle_test shared Resource pollution from leaking into normal games
 func _reset_meridian_for_battle() -> void:
 	var mer: MeridianMapData = player_actor.base_meridian
 	if mer == null:
@@ -1273,18 +898,14 @@ func _reset_meridian_for_battle() -> void:
 			pw.blocked = false
 
 
-func _check_battle_end() -> void:
-	var all_dead := true
-	for enemy in enemies:
-		if enemy.hp > 0:
-			all_dead = false
-			break
-	if all_dead:
-		fsm.transition_to(BattleStateMachine.BattleState.BATTLE_WON)
-		return
-
-	if player_actor.hp <= 0:
-		fsm.transition_to(BattleStateMachine.BattleState.BATTLE_LOST)
+func _check_battle_end_display() -> void:
+	var result: int = controller.check_battle_end()
+	if result == 1:
+		# Won — refresh enemy displays for death visuals
+		for enemy in controller.enemies:
+			_refresh_enemy_display(enemy, enemy_container)
+	elif result == 2:
+		pass  # Lost — FSM already transitioned
 
 
 # ============================================================
@@ -1292,6 +913,15 @@ func _check_battle_end() -> void:
 # ============================================================
 
 func _input(event: InputEvent) -> void:
+	# Esc 取消功法路径选择
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_ESCAPE and controller.pending_technique_card != null:
+			controller.cancel_pathway_selection()
+			_clear_pathway_highlights()
+			_refresh_hand_ui()
+			turn_label.text = "已取消路径选择"
+			return
+
 	if not _sandbox_enabled:
 		return
 	if event is InputEventKey and event.pressed and not event.echo:

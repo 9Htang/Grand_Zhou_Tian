@@ -27,7 +27,10 @@ static func apply(gm: Node, card: CardData, battle_context: Node) -> Dictionary:
 		CardData.CardType.ATTACK: _apply_attack(gm, card, battle_context)
 		CardData.CardType.DEFENSE: _apply_defense(gm, card, battle_context)
 		CardData.CardType.SKILL: _apply_skill(gm, card, battle_context)
-		CardData.CardType.TECHNIQUE: _apply_technique(gm, card, battle_context)
+		CardData.CardType.TECHNIQUE:
+				var tech_result: Dictionary = _apply_technique(gm, card, battle_context)
+				if tech_result.get("awaiting_pathway", false):
+					return {"success": true, "awaiting_pathway": true, "destination": "", "container_cards": []}
 		CardData.CardType.QI_GATHER: _apply_qi_gather(gm, card, battle_context)
 		CardData.CardType.ELIXIR: _apply_elixir(gm, card, battle_context)
 		CardData.CardType.ARTIFACT_CARD: _apply_artifact_card(gm, card, battle_context)
@@ -140,14 +143,25 @@ static func _apply_skill(gm: Node, card: CardData, ctx: Node) -> void:
 # Technique
 # ============================================================
 
-static func _apply_technique(gm: Node, card: CardData, ctx: Node) -> void:
+static func _apply_technique(gm: Node, card: CardData, ctx: Node) -> Dictionary:
 	var tech: TechniqueData = TechniqueDatabase.get_technique(card.technique_id)
 	if not tech:
-		return
+		return {"awaiting_pathway": false}
 	if gm.active_techniques.size() >= gm.talent:
 		ctx._handle_technique_overflow(tech)
-		return
+		return {"awaiting_pathway": false}
+
+	# 检查是否需要经脉路径选择（CombatActor 支持 technique_pathways）
+	if gm.has_method("get_dantian_adjacent_nodes"):
+		var available: Array = gm.get_dantian_adjacent_nodes()
+		if available.is_empty():
+			return {"awaiting_pathway": false}  # 无可用起点，激活失败
+		# 需要玩家选择路径 — 暂不激活，等待第二阶段
+		return {"awaiting_pathway": true}
+
+	# 无路径系统（敌人/旧数据）→ 直接激活
 	gm.activate_technique(tech)
+	return {"awaiting_pathway": false}
 
 
 # ============================================================

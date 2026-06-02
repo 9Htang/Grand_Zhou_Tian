@@ -216,6 +216,7 @@ static func _inject_from_dantian(gm: Node, meridian: MeridianMapData) -> bool:
 	if dantian == null:
 		return false
 
+	# 收集丹田邻接穴位（活路径）
 	var active_neighbors: Array[int] = []
 	for conn: int in dantian.connections:
 		var cn: MeridianNodeData = meridian.get_node(conn)
@@ -231,44 +232,82 @@ static func _inject_from_dantian(gm: Node, meridian: MeridianMapData) -> bool:
 
 	gm.dantian_qi -= inject_total
 
-	# 按宽度分配，冲刷目标经脉权重×4（灵气集中流向玩家选择的穴位）
 	var erosion_targets: Array = gm.get("erosion_targets")
 	if erosion_targets == null:
 		erosion_targets = []
-	var total_weight: float = 0.0
-	for idx: int in active_neighbors:
-		var pw: MeridianPathwayData = _find_pathway(meridian, dantian_idx, idx)
-		if pw and not pw.blocked:
-			var w: float = pw.width
-			if idx in erosion_targets:
-				w *= 4.0
-			total_weight += w
 
-	if total_weight <= 0:
-		gm.dantian_qi += inject_total
-		return false
+	# === 按功法路径绑定分配注入 ===
+	var tech_weights: Dictionary = _calc_technique_injection_weights(gm)
+	var technique_pathways: Dictionary = gm.get("technique_pathways")
+	if technique_pathways == null:
+		technique_pathways = {}
 
 	var injected: bool = false
-	var tech_weights: Dictionary = _calc_technique_injection_weights(gm)
-	for idx: int in active_neighbors:
-		var pw: MeridianPathwayData = _find_pathway(meridian, dantian_idx, idx)
-		if pw == null or pw.blocked:
-			continue
-		var w: float = pw.width
-		if idx in erosion_targets:
-			w *= 4.0
-		var share: float = inject_total * (w / total_weight)
-		var space: float = pw.max_capacity - pw.current_qi
-		var capped_share: float = min(share, max(0.0, space))
-		pw.current_qi += capped_share
-		# 按功法权重分配归属
-		if capped_share > 0 and not tech_weights.is_empty():
-			for tech_id: String in tech_weights:
-				var tech_share: float = capped_share * tech_weights[tech_id]
-				if tech_share > 0.001:
-					var existing: float = pw.technique_qi.get(tech_id, 0.0)
-					pw.technique_qi[tech_id] = existing + tech_share
-		injected = true
+	var allocated_qi: float = 0.0
+	var unbound_weight: float = 0.0  # 未绑定功法的总权重
+
+	if not tech_weights.is_empty():
+		# 第一轮：有路径绑定的功法 → 只注入到绑定起点对应的路径
+		for tech_id: String in tech_weights:
+			var binding: Dictionary = technique_pathways.get(tech_id, {})
+			var start_node: int = binding.get("from", -1)
+			if start_node < 0 or not (start_node in active_neighbors):
+				# 无绑定或起点不可达 → 累积到未绑定权重
+				unbound_weight += tech_weights[tech_id]
+				continue
+
+			var pw: MeridianPathwayData = _find_pathway(meridian, dantian_idx, start_node)
+			if pw == null or pw.blocked:
+				unbound_weight += tech_weights[tech_id]
+				continue
+
+			var tech_share: float = inject_total * tech_weights[tech_id]
+			# 冲刷目标加权
+			if start_node in erosion_targets:
+				tech_share *= 4.0
+			var space: float = pw.max_capacity - pw.current_qi
+			var capped: float = min(tech_share, max(0.0, space))
+			if capped > 0.001:
+				pw.current_qi += capped
+				pw.technique_qi[tech_id] = pw.technique_qi.get(tech_id, 0.0) + capped
+				allocated_qi += tech_share  # 按原始份额计数（防止超额）
+				injected = true
+
+	# 第二轮：未绑定功法 + 无路径的权重 → 按旧逻辑分配到所有邻接路径
+	var remaining: float = inject_total - allocated_qi
+	if remaining > 0.001:
+		# 计算所有邻接路径的权重分配
+		var total_weight: float = 0.0
+		for idx: int in active_neighbors:
+			var pw: MeridianPathwayData = _find_pathway(meridian, dantian_idx, idx)
+			if pw and not pw.blocked:
+				var w: float = pw.width
+				if idx in erosion_targets:
+					w *= 4.0
+				total_weight += w
+
+		if total_weight > 0:
+			for idx: int in active_neighbors:
+				var pw: MeridianPathwayData = _find_pathway(meridian, dantian_idx, idx)
+				if pw == null or pw.blocked:
+					continue
+				var w: float = pw.width
+				if idx in erosion_targets:
+					w *= 4.0
+				var share: float = remaining * (w / total_weight)
+				var space: float = pw.max_capacity - pw.current_qi
+				var capped_share: float = min(share, max(0.0, space))
+				pw.current_qi += capped_share
+				# 未绑定功法的 qi 按权重分配
+				if capped_share > 0 and unbound_weight > 0:
+					for tech_id: String in tech_weights:
+						var binding: Dictionary = technique_pathways.get(tech_id, {})
+						if binding.get("from", -1) >= 0:
+							continue  # 已绑定的跳过
+						var tech_share: float = capped_share * tech_weights[tech_id]
+						if tech_share > 0.001:
+							pw.technique_qi[tech_id] = pw.technique_qi.get(tech_id, 0.0) + tech_share
+				injected = true
 
 	return injected
 

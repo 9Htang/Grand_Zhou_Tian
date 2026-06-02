@@ -97,3 +97,63 @@ func trigger_breakthrough() -> void:
 	realm += 1
 	realm_changed.emit(realm)
 	cultivation_changed.emit(cultivation, cultivation_to_next)
+
+
+# ============================================================
+# GameManager Sync (战斗开始/结束时调用)
+# ============================================================
+
+## 从 GameManager 加载状态到 PlayerActor（战斗开始时调用）
+func load_from_gm() -> void:
+	hp = GameManager.player_hp
+	max_hp = GameManager.player_max_hp
+	dantian_qi = GameManager.dantian_qi
+	dantian_capacity = GameManager.dantian_capacity
+	qi_gather_rate = GameManager.qi_gather_rate
+	dantian_pressure = GameManager.dantian_pressure
+	current_block = GameManager.current_block
+	realm = GameManager.realm
+	talent = GameManager.talent
+	active_techniques = GameManager.active_techniques.duplicate()
+	active_buffs = GameManager.active_buffs.duplicate()
+	base_meridian = GameManager.base_meridian
+	active_circuits = GameManager.active_circuits.duplicate()
+	erosion_targets = GameManager.erosion_targets.duplicate()
+	erosion_bonuses = GameManager.erosion_bonuses.duplicate()
+	qi_gather_bonuses = GameManager.qi_gather_bonuses.duplicate()
+	is_flow_dry = GameManager.is_flow_dry
+	node_base_buffs = GameManager.node_base_buffs.duplicate()
+	damaged_pathways = GameManager.damaged_pathways.duplicate()
+	gold = GameManager.gold
+	cultivation = GameManager.cultivation
+	cultivation_to_next = GameManager.cultivation_to_next
+	technique_pathways = GameManager.technique_pathways.duplicate()
+	master_deck = GameManager.master_deck.duplicate()
+
+
+## 将 PlayerActor 状态写回 GameManager（战斗结束时调用）
+func save_to_gm() -> void:
+	GameManager.player_hp = hp
+	GameManager.player_max_hp = max_hp
+	GameManager.dantian_qi = dantian_qi
+	GameManager.dantian_capacity = dantian_capacity
+	GameManager.qi_gather_rate = qi_gather_rate
+	GameManager.dantian_pressure = dantian_pressure
+	GameManager.current_block = current_block
+	GameManager.realm = realm
+	GameManager.talent = talent
+	GameManager.active_techniques = active_techniques.duplicate()
+	GameManager.active_buffs = active_buffs.duplicate()
+	GameManager.base_meridian = base_meridian
+	GameManager.active_circuits = active_circuits.duplicate()
+	GameManager.erosion_targets = erosion_targets.duplicate()
+	GameManager.erosion_bonuses = erosion_bonuses.duplicate()
+	GameManager.qi_gather_bonuses = qi_gather_bonuses.duplicate()
+	GameManager.is_flow_dry = is_flow_dry
+	GameManager.node_base_buffs = node_base_buffs.duplicate()
+	GameManager.damaged_pathways = damaged_pathways.duplicate()
+	GameManager.gold = gold
+	GameManager.cultivation = cultivation
+	GameManager.cultivation_to_next = cultivation_to_next
+	GameManager.technique_pathways = technique_pathways.duplicate()
+	GameManager.master_deck = master_deck.duplicate()

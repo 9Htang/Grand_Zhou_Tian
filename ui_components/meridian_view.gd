@@ -58,6 +58,32 @@ var _intersection_nodes: Array[int] = []          # 中性交汇穴位
 var _frontier_nodes: Array[int] = []              # 断流前沿
 
 
+# === Pathway Selection Highlight (功法路径选择) ===
+var _highlight_start_nodes: Array[int] = []   # 起点候选穴位
+var _highlight_end_nodes: Array[int] = []     # 终点候选穴位
+var _pathway_techniques: Dictionary = {}       # {"from->to": [tech_id, ...]}
+
+
+## 设置路径选择高亮：起点列表和终点列表
+func set_pathway_highlights(start_nodes: Array[int], end_nodes: Array[int]) -> void:
+	_highlight_start_nodes = start_nodes.duplicate()
+	_highlight_end_nodes = end_nodes.duplicate()
+	queue_redraw()
+
+
+## 清除所有路径选择高亮
+func clear_pathway_highlights() -> void:
+	_highlight_start_nodes.clear()
+	_highlight_end_nodes.clear()
+	queue_redraw()
+
+
+## 设置功法占用的路径数据（用于显示路径占用状态）
+func set_technique_pathways(data: Dictionary) -> void:
+	_pathway_techniques = data
+	queue_redraw()
+
+
 func set_meridian(m: MeridianMapData) -> void:
 	_meridian = m
 	queue_redraw()
@@ -410,6 +436,13 @@ func _draw() -> void:
 			var fill_r: float = inner_r + (r - inner_r) * fill_ratio
 			if fill_r > inner_r + 0.5:
 				draw_circle(pos, fill_r, fill_color)
+
+		# Pathway Selection Highlight (功法路径选择高亮)
+		if i in _highlight_start_nodes:
+			var pulse: float = 1.0 + sin(Time.get_ticks_msec() * 0.005) * 0.3
+			draw_arc(pos, r + 6.0 * pulse, 0, TAU, 32, Color(1.0, 0.84, 0.0, 0.8), 3.0)
+		if i in _highlight_end_nodes:
+			draw_arc(pos, r + 5.0, 0, TAU, 32, Color(0.0, 0.9, 0.8, 0.7), 2.5)
 
 		# Node border
 		draw_arc(pos, r + 0.5, 0, TAU, 32, Color(0, 0, 0, 0.6), 1.5)

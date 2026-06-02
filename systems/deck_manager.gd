@@ -69,9 +69,9 @@ func discard_hand() -> void:
 # Cancel Mechanics (功法 / 持续技能)
 # ============================================================
 
-## 取消运行中的功法：功法卡回手牌，下回合抽牌数 -1
+## 取消运行中的功法：功法卡回抽牌堆，下回合抽牌数 -1
 func cancel_technique(card: CardData) -> void:
-	hand.append(card)
+	draw_pile.append(card)
 	pending_draw_penalty += 1
 
 

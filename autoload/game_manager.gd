@@ -46,6 +46,8 @@ var gold: int = 0
 var current_block: int = 0
 var active_buffs: Array = []           # Array[TechniqueResolver.ResolvedBuff]
 var active_techniques: Array[TechniqueData] = []
+## 功法→路径绑定: {technique_id: {"from": int, "to": int}}
+var technique_pathways: Dictionary = {}
 
 # === Meridian State ===
 var base_meridian: MeridianMapData = null
@@ -115,6 +117,7 @@ func start_new_run(starting_technique_id: String = "") -> void:
 	current_block = 0
 
 	active_techniques.clear()
+	technique_pathways.clear()
 	active_buffs.clear()
 	artifacts.clear()
 	equipment.clear()

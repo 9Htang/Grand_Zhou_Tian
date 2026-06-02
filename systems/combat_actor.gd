@@ -34,6 +34,8 @@ var active_buffs: Array = []              # Array[TechniqueResolver.ResolvedBuff
 var artifacts: Array[ArtifactData] = []
 var realm: int = 1
 var talent: int = 1
+## 功法→路径绑定: {technique_id: {"from": int, "to": int}}
+var technique_pathways: Dictionary = {}
 
 # === Meridian State ===
 var base_meridian: MeridianMapData = null
@@ -299,3 +301,55 @@ func clear_card_buffs() -> void:
 			kept.append(buff)
 	active_buffs = kept
 	buffs_updated.emit(active_buffs)
+
+
+# ============================================================
+# Technique Pathway Binding (功法→经脉路径挂载)
+# ============================================================
+
+## 获取功法绑定的路径，返回 {"from": int, "to": int} 或空字典
+func get_bound_pathway(tech_id: String) -> Dictionary:
+	return technique_pathways.get(tech_id, {})
+
+
+## 绑定功法到经脉路径 (from_idx=起点穴位, to_idx=终点穴位)
+func bind_technique_to_pathway(tech_id: String, from_idx: int, to_idx: int) -> void:
+	technique_pathways[tech_id] = {"from": from_idx, "to": to_idx}
+
+
+## 解除功法的路径绑定
+func unbind_technique_pathway(tech_id: String) -> void:
+	technique_pathways.erase(tech_id)
+
+
+## 获取挂载在指定路径上的所有功法 ID 列表
+func get_pathway_techniques(from_idx: int, to_idx: int) -> Array[String]:
+	var result: Array[String] = []
+	for tech_id in technique_pathways:
+		var binding: Dictionary = technique_pathways[tech_id]
+		if binding.get("from", -1) == from_idx and binding.get("to", -1) == to_idx:
+			result.append(tech_id)
+	return result
+
+
+## 获取所有丹田邻接的已解锁未阻塞穴位（= 可用起点）
+func get_dantian_adjacent_nodes() -> Array[int]:
+	var result: Array[int] = []
+	if base_meridian == null:
+		return result
+	var dantian_idx: int = base_meridian.dantian_node_index
+	for pw in base_meridian.pathways:
+		var pw_data: MeridianPathwayData = pw as MeridianPathwayData
+		if pw_data == null or pw_data.blocked:
+			continue
+		var neighbor: int = -1
+		if pw_data.from_node == dantian_idx:
+			neighbor = pw_data.to_node
+		elif pw_data.to_node == dantian_idx:
+			neighbor = pw_data.from_node
+		if neighbor >= 0:
+			var node: MeridianNodeData = base_meridian.get_node(neighbor)
+			if node and node.unlocked and not node.blocked:
+				if not result.has(neighbor):
+					result.append(neighbor)
+	return result
