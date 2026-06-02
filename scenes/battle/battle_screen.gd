@@ -352,6 +352,7 @@ func _load_encounter() -> EncounterData:
 
 func _spawn_enemies() -> void:
 	for child in enemy_container.get_children():
+		enemy_container.remove_child(child)
 		child.queue_free()
 	enemies.clear()
 
@@ -981,6 +982,7 @@ const DEBUFF_NAMES := ["burn", "vulnerable", "weak", "self_damage", "energy_down
 
 func _update_buffs(buffs: Array) -> void:
 	for child in buffs_bar.get_children():
+		buffs_bar.remove_child(child)
 		child.queue_free()
 	for buff in buffs:
 		var icon := PanelContainer.new()
@@ -994,6 +996,7 @@ func _update_buffs(buffs: Array) -> void:
 
 func _refresh_hand_ui() -> void:
 	for child in hand_area.get_children():
+		hand_area.remove_child(child)
 		child.queue_free()
 
 	var gm: Node = _gm()
@@ -1031,6 +1034,7 @@ func _set_technique_highlight(active: bool) -> void:
 
 func _refresh_technique_area() -> void:
 	for child in technique_area.get_children():
+		technique_area.remove_child(child)
 		child.queue_free()
 
 	for tech: TechniqueData in player_actor.active_techniques:

@@ -367,6 +367,7 @@ func _on_choice_selected(choice: Dictionary) -> void:
 
 	# 清除选项
 	for child in _choices_vbox.get_children():
+		_choices_vbox.remove_child(child)
 		child.queue_free()
 
 	# 先执行消耗
