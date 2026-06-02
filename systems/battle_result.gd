@@ -39,6 +39,16 @@ var executed: bool = true
 ## 执行失败原因（条件未满足等）
 var failure_reason: String = ""
 
+## 执行是否完成（所有节点已执行）
+var completed: bool = false
+
+## 是否等待玩家选择目标
+var waiting: bool = false
+
+## 等待中的选择器声明 — {"type": "path", "count": 1}
+## 非空时 BattleController 应调 TargetManager.request(selector)
+var selector: Dictionary = {}
+
 
 # === Debug Trace ===
 

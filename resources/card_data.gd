@@ -169,6 +169,12 @@ enum CardBehavior { NORMAL = 0, TECHNIQUE = 1, PERSISTENT_SKILL = 2, MOUNT_ARTIF
 ## 非空时优先使用此字段，忽略 legacy damage/block/heal 等字段
 @export var base_effects: Array = []
 
+## 生命周期触发器效果 — Dictionary{String: Array[EffectNode]}
+## 支持 key: "on_draw" / "on_discard" / "on_exhaust" /
+##   "on_hand_enter" / "on_hand_leave" / "on_retain"
+## base_effects 等价于 "on_play"，无需在此重复
+@export var trigger_effects: Dictionary = {}
+
 
 # ============================================================
 # 查询方法
@@ -201,6 +207,11 @@ func get_element_int() -> int:
 ## 是否使用新的 base_effects 系统
 func uses_base_effects() -> bool:
 	return not base_effects.is_empty()
+
+
+## 是否包含指定触发器的效果
+func has_trigger(key: String) -> bool:
+	return trigger_effects.has(key) and not trigger_effects[key].is_empty()
 
 
 ## 是否有升级分支

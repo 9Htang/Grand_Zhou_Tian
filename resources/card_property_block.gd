@@ -140,3 +140,8 @@ extends Resource
 
 ## 基础效果节点 — EffectNode 数组
 @export var base_effects: Array = []
+
+## 生命周期触发器效果 — Dictionary{String: Array[EffectNode]}
+## 支持 key: "on_draw" / "on_discard" / "on_exhaust" /
+##   "on_hand_enter" / "on_hand_leave" / "on_retain"
+@export var trigger_effects: Dictionary = {}

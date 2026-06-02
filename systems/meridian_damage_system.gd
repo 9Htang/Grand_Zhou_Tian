@@ -58,7 +58,7 @@ static func repair_pathway(gm: Node, from_idx: int, to_idx: int) -> void:
 	var key: String = _pw_key(from_idx, to_idx)
 	var data: Dictionary = gm.damaged_pathways.get(key, {})
 	var original_width: float = data.get("original_width", 1.0)
-	var original_capacity: float = data.get("original_capacity", 5.0)
+	var original_capacity: float = data.get("original_capacity", pw.base_capacity)
 
 	pw.damaged = false
 	pw.width = original_width
@@ -80,7 +80,7 @@ static func repair_all(gm: Node) -> void:
 			var key2: String = _pw_key(pw.to_node, pw.from_node)
 			var data: Dictionary = gm.damaged_pathways.get(key1, gm.damaged_pathways.get(key2, {}))
 			var original_width: float = data.get("original_width", 1.0)
-			var original_capacity: float = data.get("original_capacity", 5.0)
+			var original_capacity: float = data.get("original_capacity", pw.base_capacity)
 
 			pw.damaged = false
 			pw.width = original_width

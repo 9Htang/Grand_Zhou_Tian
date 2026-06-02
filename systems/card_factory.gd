@@ -202,6 +202,9 @@ static func _apply_block(card: CardData, block: CardPropertyBlock) -> void:
 	# 效果图 (新)
 	card.base_effects = block.base_effects.duplicate()
 
+	# 触发器效果
+	card.trigger_effects = _deep_copy_trigger_effects(block.trigger_effects)
+
 	# 旧升级字段 (兼容过渡)
 	card.upgrade_damage_bonus = block.upgrade_damage_bonus
 	card.upgrade_block_bonus = block.upgrade_block_bonus
@@ -246,7 +249,25 @@ static func _apply_overrides(card: CardData, overrides: Dictionary) -> void:
 			"cost_reduce_per_upgrade": card.cost_reduce_per_upgrade = val
 			"upgrade_branches": card.upgrade_branches = val
 			"base_effects": card.base_effects = val
+			"trigger_effects": card.trigger_effects = val
 			# 旧字段向后兼容
 			"upgrade_damage_bonus": card.upgrade_damage_bonus = val
 			"upgrade_block_bonus": card.upgrade_block_bonus = val
 			"upgrade_cost_reduction": card.upgrade_cost_reduction = val
+
+
+# ============================================================
+# Internal Helpers
+# ============================================================
+
+
+## 深拷贝 trigger_effects Dictionary: 值中的 EffectNode 数组也深拷贝
+static func _deep_copy_trigger_effects(src: Dictionary) -> Dictionary:
+	var result: Dictionary = {}
+	for key: String in src:
+		var arr: Array = src[key]
+		var copied: Array = []
+		for node: EffectNode in arr:
+			copied.append(node.duplicate_node())
+		result[key] = copied
+	return result

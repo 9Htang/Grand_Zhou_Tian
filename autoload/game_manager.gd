@@ -527,6 +527,8 @@ func add_buff(buff_str: String) -> void:
 	buff.name = parts[0]
 	buff.value = int(parts[1])
 	buff.source = "card"
+	if parts.size() >= 3:
+		buff.turns_remaining = int(parts[2])
 	active_buffs.append(buff)
 	buffs_updated.emit(active_buffs)
 
@@ -542,11 +544,18 @@ func clear_technique_buffs() -> void:
 
 
 func clear_card_buffs() -> void:
-	# 清除卡牌生成的 buff（source="card"），在 TURN_END 时调用
+	# 回合结束时处理卡牌增益: 递减 turns_remaining, 归零则移除
 	var kept: Array = []
 	for buff in active_buffs:
 		if buff.source != "card":
 			kept.append(buff)
+			continue
+		if buff.turns_remaining > 1:
+			buff.turns_remaining -= 1
+			kept.append(buff)
+		elif buff.turns_remaining == 0:
+			kept.append(buff)  # 无回合限制，保留
+		# turns_remaining == 1 → 到期移除
 	active_buffs = kept
 	buffs_updated.emit(active_buffs)
 

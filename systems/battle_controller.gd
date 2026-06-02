@@ -18,6 +18,16 @@ var fsm: BattleStateMachine = null
 var current_encounter: EncounterData = null
 var current_target: int = 0
 var _last_collision = null                    # QiCollisionResolver.CollisionResult
+var card_trigger_router: CardTriggerRouter = null  # 卡牌触发器路由器
+var target_manager: TargetManager = null             # 目标选择调度器
+
+# === Pathway Selection State ===
+var pending_technique_card: CardData = null     # 等待路径选择的功法卡
+var pathway_selection_from: int = -1            # 路径起点穴位索引
+
+# === 两阶段执行状态 (Resolver.step 遇到 selector 时) ===
+var _pending_runtime: CardRuntime = null         # 等待目标选择的执行上下文
+var _pending_battle_ctx: BattleContext = null    # 等待中的战斗上下文
 
 
 # ============================================================
@@ -97,6 +107,21 @@ func start_battle() -> bool:
 	deck_manager = DeckManager.new()
 	deck_manager.initialize(player.master_deck.duplicate())
 
+	# 初始化卡牌触发器路由
+	var trigger_ctx: BattleContext = BattleContext.new()
+	trigger_ctx.actor = player
+	trigger_ctx.turn_count = GameManager.turn_count
+	card_trigger_router = CardTriggerRouter.new(trigger_ctx)
+	deck_manager.trigger_router = card_trigger_router
+
+	# 根据丹田容量初始化经脉路径容量
+	if player.base_meridian:
+		QiFlowSystem.init_pathway_capacities(player)
+
+	# 初始化目标选择调度器
+	target_manager = TargetManager.new()
+	target_manager.selection_completed.connect(_on_target_selection_completed)
+
 	fsm.transition_to(BattleStateMachine.BattleState.PRE_BATTLE)
 	return true
 
@@ -141,6 +166,10 @@ func execute_player_turn() -> void:
 	var extra_draw: float = NodePropertyResolver.get_active_property_total(player, "extra_draw")
 	if extra_draw > 0:
 		deck_manager.draw_cards(int(extra_draw))
+
+	# 更新触发器上下文的回合计数
+	if card_trigger_router and card_trigger_router.context:
+		card_trigger_router.context.turn_count = GameManager.turn_count
 
 	fsm.transition_to(BattleStateMachine.BattleState.PLAYER_ACTION)
 
@@ -334,6 +363,87 @@ func play_card(card_data: CardData) -> Dictionary:
 	return {"played": true, "container_cards": container_cards}
 
 
+# ============================================================
+# Resolver-based Effect Execution (base_effects 路径)
+# ============================================================
+
+
+## 使用 Resolver.begin()+step() 执行 base_effects 卡牌
+## 支持 selector → TargetManager 两阶段选择
+func execute_effect_graph(card_data: CardData) -> Dictionary:
+	# 构建 CardRuntime
+	var runtime: CardRuntime = CardFactory.create_runtime_direct(card_data.id)
+	if runtime.effect_graph.is_empty():
+		return {"played": false, "reason": "empty effect graph"}
+
+	var ctx: BattleContext = _build_battle_context()
+
+	# Step 1-6: 初始化
+	var init_result: BattleResult = Resolver.begin(runtime, ctx)
+	if not init_result.executed:
+		return {"played": false, "reason": init_result.failure_reason}
+
+	# Step 7: 循环执行
+	return _resolve_loop(runtime, ctx)
+
+
+func _resolve_loop(runtime: CardRuntime, ctx: BattleContext) -> Dictionary:
+	var result: BattleResult = Resolver.step(runtime, ctx)
+
+	if result.waiting:
+		# 挂起等待目标选择
+		_pending_runtime = runtime
+		_pending_battle_ctx = ctx
+		target_manager.request(result.selector, ctx)
+		return {"played": true, "awaiting_selection": true, "selector": result.selector}
+
+	if result.completed:
+		# 完成 → 路由卡牌
+		var dest: String = CardEffects._get_destination(runtime.base_data)
+		match dest:
+			"discard": deck_manager.play_card(runtime.base_data)
+			"exhaust": deck_manager.exhaust_card(runtime.base_data)
+		return {"played": true}
+
+	# 继续循环（无 selector 时自动执行所有节点）
+	if result.executed:
+		return _resolve_loop(runtime, ctx)
+
+	return {"played": false, "reason": "unknown state"}
+
+
+func _on_target_selection_completed(_selector: Dictionary, selected: Array) -> void:
+	if _pending_runtime == null:
+		return
+
+	# 将选择结果写入 runtime
+	var plan: ExecutionPlan = _pending_runtime.execution_plan
+	var node_id: String = plan.order[_pending_runtime.step_pc]
+	_pending_runtime.selected_targets[node_id] = selected
+
+	# 恢复执行
+	var result: Dictionary = _resolve_loop(_pending_runtime, _pending_battle_ctx)
+
+	# 如果不再等待（完成），清理状态
+	if not result.get("awaiting_selection", false):
+		_pending_runtime = null
+		_pending_battle_ctx = null
+
+		if screen and screen.has_method("_on_effect_execution_done"):
+			screen._on_effect_execution_done(result)
+
+
+func _build_battle_context() -> BattleContext:
+	var ctx: BattleContext = BattleContext.new()
+	ctx.actor = player
+	ctx.turn_count = GameManager.turn_count
+	ctx.realm = player.realm
+	ctx.talent = player.talent
+	if not enemies.is_empty():
+		ctx.opponent = enemies[current_target]
+	return ctx
+
+
 ## 处理卡牌拖放到功法区
 func activate_technique_via_card(card_data: CardData) -> Dictionary:
 	if card_data.card_type != CardData.CardType.TECHNIQUE:
@@ -432,13 +542,21 @@ func run_qi_circulation_for_actor(actor: CombatActor) -> void:
 
 	# Buff generation (linear scaling)
 	actor.clear_technique_buffs()
-	var all_buffs: Array = TechniqueResolver.resolve_network_buffs(
+
+	# 保存卡牌/效果来源的 buff，避免被功法 buff 覆盖
+	var card_buffs: Array = []
+	for buff in actor.active_buffs:
+		card_buffs.append(buff)
+
+	var tech_buffs: Array = TechniqueResolver.resolve_network_buffs(
 		techniques, meridian, actor.node_base_buffs, collision, flow_tracker
 	)
-	actor.active_buffs = all_buffs
+	# 合并功法 buff + 卡牌 buff，功法在前（优先消费）
+	tech_buffs.append_array(card_buffs)
+	actor.active_buffs = tech_buffs
 
-	# Consume generated buffs
-	_consume_buffs(actor, all_buffs)
+	# Consume generated buffs (含功法 + 卡牌)
+	_consume_buffs(actor, tech_buffs)
 
 	ArtifactManager.on_qi_circulate(actor)
 

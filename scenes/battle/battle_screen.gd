@@ -398,6 +398,12 @@ func _connect_signals() -> void:
 	player_actor.technique_activated.connect(_on_technique_changed)
 	player_actor.technique_deactivated.connect(_on_technique_changed)
 
+	# TargetManager signals
+	if controller and controller.target_manager:
+		controller.target_manager.selection_started.connect(_on_target_selection_started)
+		controller.target_manager.selection_completed.connect(_on_target_selection_completed)
+		controller.target_manager.selection_cancelled.connect(_on_target_selection_cancelled)
+
 
 # ============================================================
 # FSM Handlers (thin wrappers — logic in BattleController)
@@ -582,8 +588,22 @@ func _on_technique_clicked(event: InputEvent, tech: TechniqueData) -> void:
 # Meridian Interaction
 # ============================================================
 
-## Single click acupoint → pathway selection OR info popup
+## Single click acupoint → target selection OR pathway selection OR info popup
 func _on_node_info(idx: int, node: MeridianNodeData) -> void:
+	# TargetManager 选择模式下 → 提交节点目标
+	if controller.target_manager and controller.target_manager.is_selecting():
+		var sel_type: String = controller.target_manager.pending_selector.get("type", "")
+		var target: Dictionary = {}
+		match sel_type:
+			"node":
+				target = {"idx": idx, "name": node.name, "unlocked": node.unlocked}
+			"path":
+				# 路径选择需要两个点击 — 交由旧 flow 处理
+				pass
+		if not target.is_empty():
+			controller.target_manager.submit_target(target)
+		return
+
 	# 功法路径选择模式下 → 节点点击 = 选路径
 	if controller.pending_technique_card != null:
 		var sel_result: int = controller.select_pathway_node(idx)
@@ -667,6 +687,57 @@ func _highlight_available_end_nodes() -> void:
 func _clear_pathway_highlights() -> void:
 	if meridian_panel and meridian_panel.has_method("clear_pathway_highlights"):
 		meridian_panel.clear_pathway_highlights()
+
+
+# ============================================================
+# TargetManager Handlers
+# ============================================================
+
+
+## TargetManager 发起选择 → 高亮合法目标
+func _on_target_selection_started(selector: Dictionary, valid_targets: Array) -> void:
+	var stype: String = selector.get("type", "")
+	match stype:
+		"node":
+			var indices: Array[int] = []
+			for t in valid_targets:
+				var idx: int = t.get("idx", -1)
+				if idx >= 0:
+					indices.append(idx)
+			if meridian_panel and meridian_panel.has_method("set_pathway_highlights"):
+				meridian_panel.set_pathway_highlights(indices, [])
+			turn_label.text = "选择目标穴位 (%d个可选)" % indices.size()
+		"path":
+			var from_nodes: Array[int] = []
+			var to_nodes: Array[int] = []
+			for t in valid_targets:
+				from_nodes.append(t.get("from", -1))
+				to_nodes.append(t.get("to", -1))
+			if meridian_panel and meridian_panel.has_method("set_pathway_highlights"):
+				meridian_panel.set_pathway_highlights(from_nodes, to_nodes)
+			turn_label.text = "选择目标经脉路径 (%d条可选)" % valid_targets.size()
+		_:
+			turn_label.text = "选择目标 (%s)" % stype
+
+
+func _on_target_selection_completed(_selector: Dictionary, _selected: Array) -> void:
+	_clear_pathway_highlights()
+	turn_label.text = ""
+
+
+func _on_target_selection_cancelled() -> void:
+	_clear_pathway_highlights()
+	turn_label.text = ""
+	if controller:
+		controller._pending_runtime = null
+		controller._pending_battle_ctx = null
+
+
+## Resolver 执行完成后刷新 UI
+func _on_effect_execution_done(_result: Dictionary) -> void:
+	_refresh_hand_ui()
+	_update_all_ui()
+	controller.check_battle_end()
 
 
 # ============================================================

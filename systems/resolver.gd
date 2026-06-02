@@ -20,8 +20,26 @@ extends RefCounted
 # ============================================================
 
 
-## 执行完整 8 步流水线
+## 执行完整 8 步流水线（向后兼容 — 无 selector 时一键执行）
 static func resolve(card: CardRuntime, context: BattleContext) -> BattleResult:
+	begin(card, context)
+
+	# Step 7-8: 循环执行直到完成或等待
+	var max_steps: int = card.execution_plan.order.size()
+	for _i in range(max_steps):
+		var result: BattleResult = step(card, context)
+		if result.completed or result.waiting:
+			return result
+
+	# 所有节点执行完毕
+	var final_result: BattleResult = BattleResult.new()
+	final_result.completed = true
+	final_result.executed = true
+	return final_result
+
+
+## Step 1-6: 初始化执行上下文
+static func begin(card: CardRuntime, context: BattleContext) -> BattleResult:
 	var result: BattleResult = BattleResult.new()
 
 	# Step 1: 校验
@@ -47,12 +65,59 @@ static func resolve(card: CardRuntime, context: BattleContext) -> BattleResult:
 	# Step 6: 构建 ExecutionPlan
 	_plan(card, result)
 
-	# Step 7: 执行效果
-	_execute(card, context, result)
+	# 重置执行游标
+	card.step_pc = 0
+	card.selected_targets.clear()
 
-	# Step 8: 产出
 	result.executed = true
-	result.add_trace("Step8: resolve complete — dmg=%d block=%d heal=%d" % [result.damage_dealt, result.block_gained, result.heal_done])
+	return result
+
+
+## Step 7 单步: 执行一个节点，返回 BattleResult
+## completed: 所有节点已执行完毕
+## waiting: 遇到 selector 需要玩家选择目标 (BattleResult.selector 有值)
+static func step(card: CardRuntime, context: BattleContext) -> BattleResult:
+	var result: BattleResult = BattleResult.new()
+	var plan: ExecutionPlan = card.execution_plan
+
+	if plan.order.is_empty() or card.step_pc >= plan.order.size():
+		result.completed = true
+		result.executed = true
+		result.add_trace("Step8: resolve complete — dmg=%d block=%d heal=%d" % [result.damage_dealt, result.block_gained, result.heal_done])
+		return result
+
+	var node_id: String = plan.order[card.step_pc]
+	var node: EffectNode = card.effect_graph.get_node(node_id)
+	if node == null:
+		result.add_trace("Step7: node %s not found — skip" % node_id)
+		card.step_pc += 1
+		result.completed = card.step_pc >= plan.order.size()
+		return result
+
+	# 检查是否需要目标选择
+	if not node.selector.is_empty():
+		# 如果已为此节点选择了目标，注入到 meta
+		var sel_key: String = node.id
+		if card.selected_targets.has(sel_key):
+			node.meta["selected"] = card.selected_targets[sel_key]
+			# 已有目标 → 执行
+			_dispatch(node, context, result)
+			result.add_trace("Step7: executed %s(%s)=%d (with selection)" % [node.type, node.id, node.value])
+			card.step_pc += 1
+			result.completed = card.step_pc >= plan.order.size()
+			return result
+
+		# 无目标 → 请求选择
+		result.waiting = true
+		result.selector = node.selector.duplicate()
+		result.add_trace("Step7: awaiting selection for %s — selector=%s" % [node.id, node.selector])
+		return result
+
+	# 普通效果：直接执行
+	_dispatch(node, context, result)
+	result.add_trace("Step7: executed %s(%s)=%d" % [node.type, node.id, node.value])
+	card.step_pc += 1
+	result.completed = card.step_pc >= plan.order.size()
 	return result
 
 
@@ -190,6 +255,11 @@ static func _dispatch(node: EffectNode, context: BattleContext, result: BattleRe
 			result.cards_drawn += draw
 
 		"qi_gather":
+			result.qi_gathered += node.value
+
+		"qi_restore":
+			if context.actor and context.actor.has_method("add_qi"):
+				context.actor.add_qi(node.value)
 			result.qi_gathered += node.value
 
 		"burn", "vulnerable", "weak", "stun":

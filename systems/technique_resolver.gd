@@ -14,6 +14,8 @@ class ResolvedBuff:
 	var element: String = ""
 	var source: String = ""
 	var modifier: float = 1.0
+	## 剩余持续回合数: 0=永久/手动清除, >0=每回合结束递减
+	var turns_remaining: int = 0
 
 
 ## 解析单个穴位-功法反应，线性缩放

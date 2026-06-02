@@ -74,9 +74,10 @@ static func _execute(gm: Node, cmd: String, args: PackedStringArray) -> void:
 		"self_damage":
 			gm.take_damage(_arg_int(args, 0, 0))
 		"buff":
-			# "buff:attack_up:3" → 添加 ResolvedBuff 到 active_buffs
+			# "buff:attack_up:3" 或 "buff:energy_up:1:3" (含回合数)
 			if args.size() >= 2:
-				_add_buff_to_gm(gm, args[0], int(args[1]))
+				var turns: int = int(args[2]) if args.size() >= 3 else 0
+				_add_buff_to_gm(gm, args[0], int(args[1]), turns)
 		"debuff":
 			_pending(gm, "debuff", args[0] if args.size() > 0 else "", _arg_int(args, 1, 1))
 		"attack_up":
@@ -104,11 +105,13 @@ static func _arg_int(args: PackedStringArray, index: int, default: int) -> int:
 
 
 ## 添加 ResolvedBuff 到 GameManager.active_buffs
-static func _add_buff_to_gm(gm: Node, name: String, value: int) -> void:
+## turns: 持续回合数, 0=永久 (默认)
+static func _add_buff_to_gm(gm: Node, name: String, value: int, turns: int = 0) -> void:
 	var rb := TechniqueResolver.ResolvedBuff.new()
 	rb.name = name
 	rb.value = value
 	rb.source = "effect"
+	rb.turns_remaining = turns
 	gm.active_buffs.append(rb)
 	if gm.has_signal("buffs_updated"):
 		gm.buffs_updated.emit(gm.active_buffs)

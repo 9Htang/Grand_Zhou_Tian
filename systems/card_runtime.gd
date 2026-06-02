@@ -32,8 +32,24 @@ var effect_graph: EffectGraph
 ## 执行计划 — Resolver Step 6 构建
 var execution_plan: ExecutionPlan
 
+## 触发器效果图 — Dictionary{String: EffectGraph}
+## key = 触发器名 ("on_draw"/"on_discard"/etc.)
+## 由 build_initial_graph() 预构建，CardTriggerRouter 在事件触发时查询
+var trigger_graphs: Dictionary = {}
+
 ## 临时修正 — EffectOperator 数组
 var temp_modifiers: Array = []
+
+# === 执行上下文 (Resolver.step 两阶段) ===
+
+## 当前执行到的 EffectNode 索引 (0=第一个节点)
+var step_pc: int = 0
+
+## 已选择的目标 — {"path": [{from, to}, ...], "node": [{idx, name}, ...]}
+var selected_targets: Dictionary = {}
+
+## 效果执行变量 — 用于跨节点传递值 {"damage_bonus": 3, "previous_result": ...}
+var variables: Dictionary = {}
 
 # === 战斗状态 ===
 
@@ -62,6 +78,14 @@ func build_initial_graph() -> void:
 		# 过渡期: 从 legacy 字段推导
 		effect_graph = EffectGraph.from_legacy(base_data)
 
+	# 构建触发器效果图
+	trigger_graphs.clear()
+	if base_data and not base_data.trigger_effects.is_empty():
+		for trigger_key: String in base_data.trigger_effects:
+			var effects: Array = base_data.trigger_effects[trigger_key]
+			if not effects.is_empty():
+				trigger_graphs[trigger_key] = EffectGraph.from_array(effects)
+
 
 ## 重建执行计划
 func rebuild_plan() -> void:
@@ -82,6 +106,11 @@ func get_effective_cost() -> int:
 	# temp_modifiers 中可能有 MODIFY_VALUE 影响 cost
 	# (后续由 Resolver 统一处理)
 	return c
+
+
+## 获取指定触发器的预构建 EffectGraph（如果存在）
+func get_trigger_graph(trigger_key: String) -> EffectGraph:
+	return trigger_graphs.get(trigger_key, null)
 
 
 ## 获取卡牌类型

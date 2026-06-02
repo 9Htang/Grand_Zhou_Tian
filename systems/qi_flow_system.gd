@@ -15,6 +15,49 @@ extends RefCounted
 # Public API
 # ============================================================
 
+
+## 初始化经脉路径容量（战斗开始时调用）
+## 算法: 丹田容量 × (宽度占比) × 随机扰动(0.8~1.2)
+##   每条路径的容量 = dantian_capacity × (path_width / total_width) × variation
+##   窄经(0.3): 容量小流速快, 宽经(2.0): 容量大流速慢
+##   扰动基于 from_node/to_node 的确定性哈希，同一经脉地图每次结果一致
+static func init_pathway_capacities(gm: Node) -> void:
+	if gm == null or gm.base_meridian == null:
+		return
+
+	var meridian: MeridianMapData = gm.base_meridian
+	var dantian_cap: float = float(gm.dantian_capacity)
+	if dantian_cap <= 0:
+		dantian_cap = 10.0
+
+	# 计算总宽度
+	var total_width: float = 0.0
+	for pw in meridian.pathways:
+		if pw == null:
+			continue
+		total_width += pw.width
+
+	if total_width <= 0.0:
+		return
+
+	# 为每条路径计算容量
+	for pw in meridian.pathways:
+		if pw == null:
+			continue
+		# 宽度占比
+		var share: float = pw.width / total_width
+		# 确定性扰动 (基于路径端点生成 0.8~1.2 的变异)
+		var seed: int = (pw.from_node * 7 + pw.to_node * 13) % 100
+		var variation: float = 0.8 + float(seed) / 100.0 * 0.4
+		# 基础容量 = 丹田 × 占比 × 扰动，不低于 1.0
+		# 例: 丹田10, 4条等宽经脉 → 每条 ≈ 2.0~3.0, 总计 ≈ 8~12
+		var base: float = dantian_cap * share * variation
+		base = maxf(1.0, base)
+		# 设置
+		pw.base_capacity = base
+		pw.max_capacity = base
+		pw.capacity_bonus = 0.0  # 每场战斗重置加权
+
 ## 执行一次流体推进 tick
 ## 返回: {circuits_formed: Array, flow_moved: bool, is_dry: bool}
 static func tick(gm: Node, flow_tracker: Dictionary = {}) -> Dictionary:
@@ -216,11 +259,11 @@ static func _inject_from_dantian(gm: Node, meridian: MeridianMapData) -> bool:
 	if dantian == null:
 		return false
 
-	# 收集丹田邻接穴位（活路径）
+	# 收集丹田邻接穴位（已解锁且未阻塞的活路径）
 	var active_neighbors: Array[int] = []
 	for conn: int in dantian.connections:
 		var cn: MeridianNodeData = meridian.get_node(conn)
-		if cn and not cn.blocked:
+		if cn and cn.unlocked and not cn.blocked:
 			active_neighbors.append(conn)
 
 	if active_neighbors.is_empty():
@@ -265,7 +308,7 @@ static func _inject_from_dantian(gm: Node, meridian: MeridianMapData) -> bool:
 			# 冲刷目标加权
 			if start_node in erosion_targets:
 				tech_share *= 4.0
-			var space: float = pw.max_capacity - pw.current_qi
+			var space: float = (pw.max_capacity + pw.capacity_bonus) - pw.current_qi
 			var capped: float = min(tech_share, max(0.0, space))
 			if capped > 0.001:
 				pw.current_qi += capped
@@ -295,7 +338,7 @@ static func _inject_from_dantian(gm: Node, meridian: MeridianMapData) -> bool:
 				if idx in erosion_targets:
 					w *= 4.0
 				var share: float = remaining * (w / total_weight)
-				var space: float = pw.max_capacity - pw.current_qi
+				var space: float = (pw.max_capacity + pw.capacity_bonus) - pw.current_qi
 				var capped_share: float = min(share, max(0.0, space))
 				pw.current_qi += capped_share
 				# 未绑定功法的 qi 按权重分配
@@ -354,7 +397,7 @@ static func _propagate_nodes_to_pathways(gm: Node, meridian: MeridianMapData) ->
 		for conn: int in active_connections:
 			var pw: MeridianPathwayData = _find_pathway(meridian, i, conn)
 			var share: float = overflow * (pw.width / total_weight)
-			var space: float = pw.max_capacity - pw.current_qi
+			var space: float = (pw.max_capacity + pw.capacity_bonus) - pw.current_qi
 			var add: float = min(share, max(0.0, space))
 			pw.current_qi += add
 			# 按比例转移功法归属

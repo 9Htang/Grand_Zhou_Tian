@@ -12,6 +12,10 @@ var exhaust_pile: Array[CardData] = []
 ## 累积的抽牌惩罚，下回合生效（取消功法/持续技能时增加）
 var pending_draw_penalty: int = 0
 
+## 卡牌触发器路由器引用（可选），在区域转换时通知卡牌生命周期事件
+## 由 BattleController 在 start_battle() 时注入
+var trigger_router: Object = null
+
 
 func initialize(card_ids: Array[String]) -> void:
 	draw_pile.clear()
@@ -36,6 +40,7 @@ func draw_cards(count: int) -> Array[CardData]:
 			var card: CardData = draw_pile.pop_front()
 			hand.append(card)
 			drawn.append(card)
+			_notify_drawn(card)
 	return drawn
 
 
@@ -50,17 +55,25 @@ func play_card(card: CardData) -> void:
 	var idx := hand.find(card)
 	if idx >= 0:
 		hand.remove_at(idx)
+		_notify_hand_leave(card)
 	discard_pile.append(card)
+	_notify_discarded(card)
 
 
 func exhaust_card(card: CardData) -> void:
 	var idx := hand.find(card)
 	if idx >= 0:
 		hand.remove_at(idx)
+		_notify_hand_leave(card)
 	exhaust_pile.append(card)
+	_notify_exhausted(card)
 
 
 func discard_hand() -> void:
+	# 在移入手牌前通知每张卡牌离开手牌并进入弃牌堆
+	for card: CardData in hand:
+		_notify_hand_leave(card)
+		_notify_discarded(card)
 	discard_pile.append_array(hand)
 	hand.clear()
 
@@ -107,6 +120,31 @@ func get_discard_count() -> int:
 
 func get_hand_size() -> int:
 	return hand.size()
+
+
+# ============================================================
+# Trigger Notifications
+# ============================================================
+
+
+func _notify_drawn(card: CardData) -> void:
+	if trigger_router and trigger_router.has_method("on_card_drawn"):
+		trigger_router.on_card_drawn(card)
+
+
+func _notify_discarded(card: CardData) -> void:
+	if trigger_router and trigger_router.has_method("on_card_discarded"):
+		trigger_router.on_card_discarded(card)
+
+
+func _notify_exhausted(card: CardData) -> void:
+	if trigger_router and trigger_router.has_method("on_card_exhausted"):
+		trigger_router.on_card_exhausted(card)
+
+
+func _notify_hand_leave(card: CardData) -> void:
+	if trigger_router and trigger_router.has_method("on_hand_leave"):
+		trigger_router.on_hand_leave(card)
 
 
 func _reshuffle_discard() -> void:

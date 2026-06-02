@@ -271,6 +271,9 @@ func gain_random_artifact() -> void:
 # Buffs
 # ============================================================
 
+## 解析并添加增益效果
+## 格式: "name:value" (永久/手动清除) 或 "name:value:turns" (多回合)
+## 例: "energy_up:1:3" → 每回合恢复1点灵气，持续3回合
 func add_buff(buff_str: String) -> void:
 	var parts: PackedStringArray = buff_str.split(":")
 	if parts.size() < 2:
@@ -279,6 +282,8 @@ func add_buff(buff_str: String) -> void:
 	buff.name = parts[0]
 	buff.value = int(parts[1])
 	buff.source = "card"
+	if parts.size() >= 3:
+		buff.turns_remaining = int(parts[2])
 	active_buffs.append(buff)
 	buffs_updated.emit(active_buffs)
 
@@ -293,12 +298,22 @@ func clear_technique_buffs() -> void:
 	buffs_updated.emit(active_buffs)
 
 
+## 回合结束时处理卡牌增益: 递减 turns_remaining, 归零则移除
+## turns_remaining=0 表示无回合限制，保持到手动清除
 func clear_card_buffs() -> void:
-	# 清除卡牌生成的 buff（source="card"），在 TURN_END 时调用
 	var kept: Array = []
 	for buff in active_buffs:
 		if buff.source != "card":
 			kept.append(buff)
+			continue
+		# 卡牌来源的 buff: 检查回合数
+		if buff.turns_remaining > 1:
+			buff.turns_remaining -= 1
+			kept.append(buff)
+		elif buff.turns_remaining == 0:
+			# 无回合限制，保留（兼容旧数据）
+			kept.append(buff)
+		# turns_remaining == 1 → 最后一回合，移除
 	active_buffs = kept
 	buffs_updated.emit(active_buffs)
 
