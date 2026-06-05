@@ -25,9 +25,6 @@ extends Resource
 ## 打出此卡牌消耗的灵气点数
 @export var cost: int = 1
 
-## 目标类型: 0=无需目标 1=单个敌人 2=全体敌人 3=自身 4=随机敌人
-@export var target_type: int = 1
-
 ## 五行元素: "火"/"水"/"木"/"金"/"土"/""=无
 @export var element: String = ""
 
@@ -54,34 +51,6 @@ extends Resource
 ## 打出后延迟生效回合数, 0=立即
 @export var delay_turns: int = 0
 
-# === 数值 ===
-
-## 基础伤害值
-@export var damage: int = 0
-
-## 基础格挡值
-@export var block: int = 0
-
-## 恢复的生命值
-@export var heal: int = 0
-
-## 额外抽取的卡牌数量
-@export var draw_count: int = 0
-
-## 蓄气时聚集的灵气量
-@export var qi_gather_amount: int = 0
-
-## 聚灵修正: 影响每回合灵气恢复量, 1.0=正常
-@export var qi_regen_mod: float = 1.0
-
-# === 增益/减益 ===
-
-## 施加给自己的增益效果字符串，格式: "buff_name:value"
-@export var buff_self: String = ""
-
-## 施加给敌人的减益效果字符串，格式: "debuff_name:value"
-@export var debuff_enemy: String = ""
-
 # === 功法关联 (仅 TECHNIQUE 行为) ===
 
 ## 关联的功法资源 ID
@@ -105,38 +74,15 @@ extends Resource
 
 # === 升级系统 ===
 
-# -- 新字段（多级升级） --
+# === 升级系统 ===
 
 ## 最大线性升级次数, 0=不可升级
 @export var max_upgrade_level: int = 0
 
-## 每级伤害加成
-@export var damage_per_upgrade: int = 0
+## 每级升级对应的 EffectOperator 数组，index 0 = Lv1
+@export var upgrade_operators: Array = []
 
-## 每级格挡加成
-@export var block_per_upgrade: int = 0
-
-## 每级治疗加成
-@export var heal_per_upgrade: int = 0
-
-## 每级减少的灵气消耗
-@export var cost_reduce_per_upgrade: int = 0
-
-## 分支目标 CardData.id 列表
-@export var upgrade_branches: Array[String] = []
-
-# -- 旧字段（兼容） --
-
-## [deprecated] 升级伤害加成 → 迁移到 damage_per_upgrade
-@export var upgrade_damage_bonus: int = 3
-
-## [deprecated] 升级格挡加成 → 迁移到 block_per_upgrade
-@export var upgrade_block_bonus: int = 3
-
-## [deprecated] 升级减费 → 迁移到 cost_reduce_per_upgrade
-@export var upgrade_cost_reduction: int = 0
-
-# === 效果图 (新) ===
+# === 效果图 ===
 
 ## 基础效果节点 — EffectNode 数组
 @export var base_effects: Array = []

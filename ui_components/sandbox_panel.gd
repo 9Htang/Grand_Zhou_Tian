@@ -223,14 +223,29 @@ func _refresh_node_list() -> void:
 # ============================================================
 
 func _build_cards_tab() -> void:
+	# Refresh button row
+	var refresh_row := HBoxContainer.new()
+	var refresh_btn := Button.new()
+	refresh_btn.text = "🔄 刷新卡牌列表"
+	refresh_btn.pressed.connect(func():
+		CardDatabase.reload()
+		_refresh_card_list()
+	)
+	refresh_btn.add_theme_font_size_override("font_size", 11)
+	refresh_row.add_child(refresh_btn)
+	_tab_cards.add_child(refresh_row)
+
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size.y = 520
+	scroll.custom_minimum_size.y = 500
 	_card_list_container = VBoxContainer.new()
 	scroll.add_child(_card_list_container)
 	_tab_cards.add_child(scroll)
 
 
 func _refresh_card_list() -> void:
+	# 每次刷新时重新扫描目录，自动加载新增/修改的卡牌
+	CardDatabase.reload()
+
 	for child in _card_list_container.get_children():
 		child.queue_free()
 

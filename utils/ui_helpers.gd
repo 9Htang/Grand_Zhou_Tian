@@ -20,6 +20,14 @@ const BUFFS_PCT: float = 0.036         # ~26/720
 const PLAYER_AREA_PCT: float = 0.039   # ~28/720
 const HAND_AREA_PCT: float = 0.306     # ~220/720
 
+# === 打出区域比例（占视口的百分比） ===
+## 打出区域宽度 — 占视口宽度的百分比
+const PLAY_ZONE_WIDTH_PCT: float = 0.70     # ~896/1280
+## 打出区域 Y 起始 — 顶栏下方
+const PLAY_ZONE_Y_PCT: float = 0.033        # ~24/720
+## 打出区域高度 — 敌人区 + 经脉区
+const PLAY_ZONE_HEIGHT_PCT: float = 0.473   # ~340/720
+
 # === 卡牌尺寸比例（占视口的百分比） ===
 const CARD_W_PCT: float = 0.078        # ~100/1280 — 普通卡牌宽
 const CARD_H_PCT: float = 0.208        # ~150/720  — 普通卡牌高

@@ -1,0 +1,42 @@
+[gd_resource type="Resource" script_class="EventData" load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://resources/event_data.gd" id="1_event"]
+[ext_resource type="Script" path="res://resources/event_choice_data.gd" id="2_choice"]
+[ext_resource type="Script" path="res://resources/event_random_outcome.gd" id="3_outcome"]
+
+[sub_resource type="Resource" id="sub_ro_1"]
+script = ExtResource("3_outcome")
+weight = 3
+text = "你在洞府深处发现了一柄古剑，剑身泛着寒光！"
+effects = Array[String](["gain_artifact:random"])
+
+[sub_resource type="Resource" id="sub_ro_2"]
+script = ExtResource("3_outcome")
+weight = 1
+text = "洞府中弥漫着毒瘴，你急忙退出，却已中毒……"
+effects = Array[String](["damage:10"])
+
+[sub_resource type="Resource" id="sub_ro_3"]
+script = ExtResource("3_outcome")
+weight = 2
+text = "你找到了一些散落的灵石，收获颇丰。"
+effects = Array[String](["gold:15"])
+
+[sub_resource type="Resource" id="sub_choice_1"]
+script = ExtResource("2_choice")
+text = "进入探索"
+cost = "hp:-5"
+random_outcomes = Array[Resource]([SubResource("sub_ro_1"), SubResource("sub_ro_2"), SubResource("sub_ro_3")])
+
+[sub_resource type="Resource" id="sub_choice_2"]
+script = ExtResource("2_choice")
+text = "谨慎绕行"
+effects = Array[String](["gold:10"])
+result_text = "你选择谨慎地绕过洞府，在路边捡到了一些散落的灵石。"
+
+[resource]
+script = ExtResource("1_event")
+id = "gu_dong_qi_yu"
+display_name = "古洞奇遇"
+description = "你发现了一个古老的洞府，洞口闪烁着微光，似乎隐藏着某种机缘。洞府深处隐约传来阵阵灵气波动，但空气中弥漫着一丝危险的气息……"
+choices = Array[Resource]([SubResource("sub_choice_1"), SubResource("sub_choice_2")])

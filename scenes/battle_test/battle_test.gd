@@ -1,4 +1,4 @@
-# ============================================================
+﻿# ============================================================
 # 大周天 — Battle Test Sandbox
 # 启动后直接进入战斗，自动注入测试数据
 # ============================================================
@@ -30,7 +30,7 @@ func _setup_test_data() -> void:
 	GameManager.node_base_buffs.clear()
 	GameManager.current_chapter = 1
 	GameManager.current_encounter_index = 0
-	GameManager.turn_count = 0
+	GameManager.elapsed_seconds = 0
 
 	# --- 测试牌组 ---
 	GameManager.master_deck = [

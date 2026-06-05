@@ -17,7 +17,6 @@ enum CardType {
 }
 
 enum CardRarity { BASIC = 0, COMMON = 1, UNCOMMON = 2, RARE = 3 }
-enum TargetType { NONE = 0, SINGLE_ENEMY = 1, ALL_ENEMIES = 2, SELF = 3, RANDOM_ENEMY = 4 }
 enum ElixirUseLocation { BATTLE_ONLY = 0, MAP_ONLY = 1, BOTH = 2 }
 
 ## 卡牌打出后的生命周期行为:
@@ -27,7 +26,8 @@ enum ElixirUseLocation { BATTLE_ONLY = 0, MAP_ONLY = 1, BOTH = 2 }
 ##   MOUNT_ARTIFACT=打出→移除, 挂载到遗物栏
 ##   CHARGE_ARTIFACT=打出→消耗充能, 攻击免费, 需重新充能
 ##   CONTAINER=打出→展开内容物, 加入手牌, 移除自身
-enum CardBehavior { NORMAL = 0, TECHNIQUE = 1, PERSISTENT_SKILL = 2, MOUNT_ARTIFACT = 3, CHARGE_ARTIFACT = 4, CONTAINER = 5 }
+##   FORGE=打出→转化卡牌特性 (薪火相传/离火易象)
+enum CardBehavior { NORMAL = 0, TECHNIQUE = 1, PERSISTENT_SKILL = 2, MOUNT_ARTIFACT = 3, CHARGE_ARTIFACT = 4, CONTAINER = 5, FORGE = 6 }
 
 # === 基础信息 ===
 
@@ -49,9 +49,6 @@ enum CardBehavior { NORMAL = 0, TECHNIQUE = 1, PERSISTENT_SKILL = 2, MOUNT_ARTIF
 ## 打出此卡牌消耗的灵气点数
 @export var cost: int = 1
 
-## 目标类型: 0=无需目标 1=单个敌人 2=全体敌人 3=自身 4=随机敌人
-@export var target_type: TargetType = TargetType.SINGLE_ENEMY
-
 ## 卡牌描述文字，展示在卡牌界面的描述区域
 @export_multiline var description: String = ""
 
@@ -66,41 +63,13 @@ enum CardBehavior { NORMAL = 0, TECHNIQUE = 1, PERSISTENT_SKILL = 2, MOUNT_ARTIF
 
 ## 打出条件表达式，空字符串=无条件
 ## 格式: "key:value" 或 "key>=value"，多条件用 ; 分隔
-## 支持: realm/talent/qi/hp_below/hp_above/has_technique/node_unlocked/turn/hand_size
+## 支持: realm/talent/qi/has_technique/node_unlocked/turn/hand_size
 @export var play_condition: String = ""
 
 # === 功法卡牌 ===
 
 ## 关联的功法资源 ID，对应 TechniqueData.id
 @export var technique_id: String = ""
-
-# === 蓄气卡牌 ===
-
-## 蓄气时聚集的灵气量
-@export var qi_gather_amount: int = 0
-
-## 聚灵修正: 影响每回合灵气恢复量, 1.0=正常, >1=增幅, <1=衰减
-@export var qi_regen_mod: float = 1.0
-
-# === 战斗属性 (legacy — 过渡期与新 base_effects 共存) ===
-
-## 卡牌造成的基础伤害值
-@export var damage: int = 0
-
-## 卡牌提供的基础格挡值
-@export var block: int = 0
-
-## 卡牌恢复的生命值
-@export var heal: int = 0
-
-## 打出此卡牌时额外抽取的卡牌数量
-@export var draw_count: int = 0
-
-## 施加给自己的增益效果字符串，格式: "buff_name:value"，如 "strength:3"
-@export var buff_self: String = ""
-
-## 施加给敌人的减益效果字符串，格式: "debuff_name:value"，如 "burn:2"
-@export var debuff_enemy: String = ""
 
 # === 丹药卡牌 ===
 
@@ -112,40 +81,13 @@ enum CardBehavior { NORMAL = 0, TECHNIQUE = 1, PERSISTENT_SKILL = 2, MOUNT_ARTIF
 
 # === 升级系统 ===
 
-# -- 新字段（多级升级） --
-
 ## 最大线性升级次数, 0=不可升级
 @export var max_upgrade_level: int = 0
 
-## 每级伤害加成
-@export var damage_per_upgrade: int = 0
-
-## 每级格挡加成
-@export var block_per_upgrade: int = 0
-
-## 每级治疗加成
-@export var heal_per_upgrade: int = 0
-
-## 每级减少的灵气消耗
-@export var cost_reduce_per_upgrade: int = 0
-
-## 分支目标 CardData.id 列表，如 ["fire_slash_rage","fire_slash_guard"]
-## 非空时走分支替换升级，忽略 per_upgrade 线性加成
-@export var upgrade_branches: Array[String] = []
-
-# -- 旧字段（兼容现存 .tres，逐步迁移） --
-
-## [deprecated] 升级后额外增加的伤害值 → 迁移到 damage_per_upgrade
-@export var upgrade_damage_bonus: int = 3
-
-## [deprecated] 升级后额外增加的格挡值 → 迁移到 block_per_upgrade
-@export var upgrade_block_bonus: int = 3
-
-## [deprecated] 升级后减少的灵气消耗量 → 迁移到 cost_reduce_per_upgrade
-@export var upgrade_cost_reduction: int = 0
-
-## [deprecated] 是否已升级 → 迁移到 CardInstance.upgrade_level
-@export var upgraded: bool = false
+## 每级升级对应的 EffectOperator 数组，index 0 = Lv1, index 1 = Lv2, ...
+## 空数组表示此卡无升级效果。
+## 例: [[select_by_type("damage"), modify_value("damage", 3)]]
+@export var upgrade_operators: Array = []
 
 # === 生命周期 ===
 
@@ -163,10 +105,38 @@ enum CardBehavior { NORMAL = 0, TECHNIQUE = 1, PERSISTENT_SKILL = 2, MOUNT_ARTIF
 ## 容器槽位类型限制: "elixir" / "artifact_active" / "any"，空数组表示无限制
 @export var container_types: Array[String] = []
 
+# === 旧版数值字段 (向后兼容) ===
+
+## 基础伤害值
+@export var damage: int = 0
+
+## 基础格挡值
+@export var block: int = 0
+
+## 基础治疗值
+@export var heal: int = 0
+
+## 蓄气量
+@export var qi_gather_amount: int = 0
+
+## 自身增益效果，格式: "name:value:duration"，如 "strength:1:3"
+@export var buff_self: String = ""
+
+## 升级时伤害加成
+@export var upgrade_damage_bonus: int = 0
+
+## 升级时格挡加成
+@export var upgrade_block_bonus: int = 0
+
+## 目标类型: 0=无需目标 1=单体敌人 2=全体敌人 3=自身 4=随机敌人
+@export var target_type: int = 0
+
+## 每次升级减少的费用
+@export var cost_reduce_per_upgrade: int = 0
+
 # === 效果图 (新 — 替代 legacy 数值字段) ===
 
 ## 基础效果节点列表 — EffectNode 数组，定义这张卡"做什么"
-## 非空时优先使用此字段，忽略 legacy damage/block/heal 等字段
 @export var base_effects: Array = []
 
 ## 生命周期触发器效果 — Dictionary{String: Array[EffectNode]}
@@ -209,36 +179,66 @@ func uses_base_effects() -> bool:
 	return not base_effects.is_empty()
 
 
+
+	## 获取卡牌的有效效果节点列表
+	## base_effects 非空 → 返回 base_effects
+	## base_effects 为空 → 从旧版平铺字段自动合成 EffectNode
+func get_or_build_effects() -> Array:
+	if not base_effects.is_empty():
+		return base_effects
+
+	var nodes: Array = []
+	if damage > 0:
+		var n: EffectNode = EffectNode.new()
+		n.id = "n_dmg"
+		n.type = "damage"
+		n.value = damage
+		n.target = TargetSpec.from_card_type(target_type)
+		nodes.append(n)
+	if block > 0:
+		var n: EffectNode = EffectNode.new()
+		n.id = "n_block"
+		n.type = "block"
+		n.value = block
+		n.target = TargetSpec.from_card_type(3)  # SELF
+		nodes.append(n)
+	if heal > 0:
+		var n: EffectNode = EffectNode.new()
+		n.id = "n_heal"
+		n.type = "heal"
+		n.value = heal
+		n.target = TargetSpec.from_card_type(3)  # SELF
+		nodes.append(n)
+	if qi_gather_amount > 0:
+		var n: EffectNode = EffectNode.new()
+		n.id = "n_qi"
+		n.type = "qi_gather"
+		n.value = qi_gather_amount
+		n.target = TargetSpec.from_card_type(0)  # NONE — self-effect
+		nodes.append(n)
+	if not buff_self.is_empty():
+		var parts: PackedStringArray = buff_self.split(":")
+		if parts.size() >= 2:
+			var n: EffectNode = EffectNode.new()
+			n.id = "n_buff"
+			n.type = "buff"
+			n.meta = {
+				"status_type": parts[0],
+				"value": int(parts[1]),
+				"duration": int(parts[2]) if parts.size() >= 3 else 1
+			}
+			n.target = TargetSpec.from_card_type(3)  # SELF
+			nodes.append(n)
+	return nodes
+
+
 ## 是否包含指定触发器的效果
 func has_trigger(key: String) -> bool:
 	return trigger_effects.has(key) and not trigger_effects[key].is_empty()
 
 
-## 是否有升级分支
-func has_upgrade_branches() -> bool:
-	return not upgrade_branches.is_empty()
-
-
-## 是否可升级（线性或分支）
+## 是否可升级（线性: upgrade_level < max_upgrade_level）
 func can_upgrade(inst: CardInstance) -> bool:
 	if inst == null:
 		return false
-	if has_upgrade_branches():
-		# 分支升级: 检查当前 base_id 对应模板是否有下级分支
-		var current_data: CardData = CardDatabase.get_card(inst.base_id)
-		if current_data:
-			return not current_data.upgrade_branches.is_empty()
-		return false
-	# 线性升级
 	return inst.upgrade_level < max_upgrade_level
-
-
-func apply_upgrade() -> CardData:
-	"""旧版二元升级 — 向后兼容。新代码请使用 CardFactory.upgrade_instance()"""
-	var c := duplicate()
-	c.damage += upgrade_damage_bonus
-	c.block += upgrade_block_bonus
-	c.cost = maxi(0, c.cost - upgrade_cost_reduction)
-	c.upgraded = true
-	c.display_name = c.display_name + "+"
-	return c

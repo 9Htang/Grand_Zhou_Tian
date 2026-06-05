@@ -121,14 +121,15 @@ class CardProvider extends RefCounted:
 
 class EnemyProvider extends RefCounted:
 	## target: {"actor": EnemyActor, "hp": int, "block": int, "index": int}
-	func get_targets(selector: Dictionary, battle: BattleContext) -> Array:
+	func get_targets(_selector: Dictionary, battle: BattleContext) -> Array:
 		var result: Array = []
-		if battle == null or battle.opponent == null:
+		if battle == null or battle.enemies == null:
 			return result
 
-		# 单敌人: 直接返回 opponent
-		var opp: Node = battle.opponent
-		result.append({
+		# 从 enemies 列表枚举所有敌人作为可选目标
+		for i in range(battle.enemies.size()):
+			var opp:Node = battle.enemies[i]
+			result.append({
 			"actor": opp,
 			"hp": opp.get("hp") if opp.get("hp") != null else 0,
 			"block": opp.get("current_block") if opp.get("current_block") != null else 0,
@@ -168,6 +169,18 @@ class EffectNodeProvider extends RefCounted:
 
 
 # ============================================================
+# FeatureProvider — 卡牌特性 (锻淬系统)
+# ============================================================
+
+class FeatureProvider extends RefCounted:
+	## 返回卡牌可选特性列表
+	## target: {"feature": str, "label": str}
+	func get_targets(selector: Dictionary, battle: BattleContext) -> Array:
+		# 需要 card_runtime 引用 — v1 返回空
+		return []
+
+
+# ============================================================
 # TechniqueProvider — 功法
 # ============================================================
 
@@ -192,5 +205,3 @@ class TechniqueProvider extends RefCounted:
 				"display_name": td.display_name,
 			})
 		return result
-
-

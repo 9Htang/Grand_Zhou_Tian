@@ -1,4 +1,4 @@
-# ============================================================
+﻿# ============================================================
 # 大周天 — Game Manager (全局游戏状态)
 # ============================================================
 extends Node
@@ -38,6 +38,12 @@ var player_hp: int = 80
 var player_max_hp: int = 80
 var realm: int = 1
 var talent: int = 2
+## 气运值，影响转化成功率等随机事件的概率
+var luck: int = 0
+## 神识值，影响特性提取精准度等
+var divine_sense: int = 0
+## 速度值，影响自动抽牌频率
+var speed: float = 1.0
 var cultivation: int = 0
 var cultivation_to_next: int = 100
 var gold: int = 0
@@ -66,6 +72,8 @@ var qi_gather_bonuses: Dictionary = {}      # 聚气加成: {source_id: amount} 
 
 # === Deck ===
 var master_deck: Array[String] = []     # CardData IDs (persistent between battles)
+## 卡牌实例注册表: {base_id: CardInstance} — 追踪转化等修改
+var card_instance_registry: Dictionary = {}
 var artifacts: Array[ArtifactData] = []
 
 # === Equipment ===
@@ -82,7 +90,7 @@ var persistent_skills: Array[CardData] = []
 # === Run State ===
 var current_chapter: int = 1
 var current_encounter_index: int = 0
-var turn_count: int = 0
+var elapsed_seconds: float = 0.0            ## 即时制: 战斗经过秒数
 var current_map_node_index: int = 0              # 当前所在地图节点
 var current_chapter_data: ChapterData = null      # 当前章节数据
 
@@ -111,6 +119,7 @@ func start_new_run(starting_technique_id: String = "") -> void:
 	qi_gather_rate = 3
 	realm = 1
 	talent = 2
+	speed = 1.0
 	cultivation = 0
 	cultivation_to_next = 100
 	gold = 0
@@ -137,7 +146,7 @@ func start_new_run(starting_technique_id: String = "") -> void:
 
 	current_chapter = 1
 	current_encounter_index = 0
-	turn_count = 0
+	elapsed_seconds = 0.0
 	current_map_node_index = 0
 	current_chapter_data = null
 

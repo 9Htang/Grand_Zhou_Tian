@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://resources/card_data.gd" id="1_card"]
+[ext_resource type="Script" path="res://systems/vm/ir/effect_node.gd" id="2_node"]
+
+[sub_resource type="Resource" id="sub_pathway_up"]
+script = ExtResource("2_node")
+id = "n1"
+type = "pathway_capacity_up"
+value = 5
+selector = {"type": "path", "count": 1}
+
+[resource]
+script = ExtResource("1_card")
+id = "fire_meridian"
+display_name = "火脉"
+card_type = 2
+rarity = 1
+element = "火"
+cost = 2
+description = "选择一条经脉路径，扩充其灵气容量+5点"
+flavor_text = "火脉贯通，经脉如洪"
+tags = ["火系", "经脉"]
+base_effects = Array[ExtResource("2_node")]([SubResource("sub_pathway_up")])

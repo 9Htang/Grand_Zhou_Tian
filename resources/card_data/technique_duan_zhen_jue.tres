@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://resources/card_data.gd" id="1_card"]
+[ext_resource type="Script" path="res://systems/vm/ir/effect_node.gd" id="2_node"]
+
+[resource]
+script = ExtResource("1_card")
+id = "technique_duan_zhen_jue"
+display_name = "煅真诀"
+card_type = 4
+rarity = 1
+element = "火"
+cost = 2
+description = "激活煅真诀功法。以火煅真，淬炼卡牌。启用薪火相传、离火易象等转化技能。"
+technique_id = "duan_zhen_jue"
+flavor_text = "以火煅真，千锤百炼"
+behavior = 1
+base_effects = Array[ExtResource("2_node")]([])

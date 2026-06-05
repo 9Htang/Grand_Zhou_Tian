@@ -19,10 +19,6 @@ func _load_all() -> void:
 
 
 func get_card(id: String) -> CardData:
-	if id.ends_with("+"):
-		var base: CardData = _cache.get(id.trim_suffix("+"))
-		if base:
-			return base.apply_upgrade()
 	return _cache.get(id)
 
 
@@ -44,6 +40,13 @@ func get_cards_by_pool(pool_ids: Array[String]) -> Array[CardData]:
 		if card:
 			result.append(card)
 	return result
+
+
+## 重新扫描 card_data 目录，热加载新增/修改的 .tres 卡牌文件
+func reload() -> void:
+	_cache.clear()
+	_all_ids.clear()
+	_load_all()
 
 
 func get_random_cards(count: int, exclude_ids: Array[String] = []) -> Array[CardData]:

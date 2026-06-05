@@ -1,3 +1,7 @@
+---
+name: obsidian-doc
+description: 管理 Obsidian 大周天项目文档 — 增删改查、模块归位、仪表盘同步、git 备份与回档
+---
 # Obsidian 文档管理规范 — 大周天项目
 
 管理 `D:\Obsidian\30-项目\大周天\` 下的所有设计文档，确保结构清晰、信息不腐、可回档。

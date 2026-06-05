@@ -19,6 +19,7 @@ func _init() -> void:
 	_provider_cache["field"] = _Providers.FieldProvider.new()
 	_provider_cache["effect_node"] = _Providers.EffectNodeProvider.new()
 	_provider_cache["technique"] = _Providers.TechniqueProvider.new()
+	_provider_cache["feature"] = _Providers.FeatureProvider.new()
 
 
 func get_provider(type: String):

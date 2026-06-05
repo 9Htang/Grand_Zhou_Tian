@@ -47,3 +47,13 @@ func get_node_count() -> int:
 
 func is_valid_index(index: int) -> bool:
 	return index >= 0 and index < nodes.size()
+
+
+## 在 pathways 中查找连接 from_idx 和 to_idx 的路径（无向）
+## 返回 MeridianPathwayData 或 null
+func find_pathway(from_idx: int, to_idx: int) -> MeridianPathwayData:
+	for pw in pathways:
+		if (pw.from_node == from_idx and pw.to_node == to_idx) or \
+		   (pw.from_node == to_idx and pw.to_node == from_idx):
+			return pw
+	return null

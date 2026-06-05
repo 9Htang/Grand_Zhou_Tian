@@ -1,0 +1,49 @@
+[gd_resource type="Resource" script_class="EventData" load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://resources/event_data.gd" id="1_event"]
+[ext_resource type="Script" path="res://resources/event_choice_data.gd" id="2_choice"]
+[ext_resource type="Script" path="res://resources/event_random_outcome.gd" id="3_outcome"]
+
+[sub_resource type="Resource" id="sub_ro_1"]
+script = ExtResource("3_outcome")
+weight = 1
+text = "你领悟了一式残招，心有所悟！"
+effects = Array[String](["gain_card:attack_basic"])
+
+[sub_resource type="Resource" id="sub_ro_2"]
+script = ExtResource("3_outcome")
+weight = 1
+text = "石壁上的功法让你对修炼有了新的理解。"
+effects = Array[String](["gain_card:qi_gathering"])
+
+[sub_resource type="Resource" id="sub_ro_3"]
+script = ExtResource("3_outcome")
+weight = 1
+text = "你从残谱中习得了一式防御之术。"
+effects = Array[String](["gain_card:defense_basic"])
+
+[sub_resource type="Resource" id="sub_choice_1"]
+script = ExtResource("2_choice")
+text = "研习功法"
+requirements = "realm>=2"
+random_outcomes = Array[Resource]([SubResource("sub_ro_1"), SubResource("sub_ro_2"), SubResource("sub_ro_3")])
+
+[sub_resource type="Resource" id="sub_choice_2"]
+script = ExtResource("2_choice")
+text = "搜寻宝物"
+effects = Array[String](["gold:20"])
+result_text = "你在洞府中翻找，发现了一些前人遗留的金币。"
+
+[sub_resource type="Resource" id="sub_choice_3"]
+script = ExtResource("2_choice")
+text = "强行破禁"
+cost = "hp:-15"
+effects = Array[String](["talent_up:1"])
+result_text = "你强行冲破禁制，虽然受了些伤，但似乎激发了自身的潜力！"
+
+[resource]
+script = ExtResource("1_event")
+id = "xian_ren_yi_fu"
+display_name = "仙人遗府"
+description = "一座废弃的仙人洞府矗立在前方，石门半掩。石壁上刻着残缺的功法文字，虽然年代久远，仍能感受到其中的玄奥气息。府内似乎还藏着不少宝物……"
+choices = Array[Resource]([SubResource("sub_choice_1"), SubResource("sub_choice_2"), SubResource("sub_choice_3")])

@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="TechniqueData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/technique_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "duan_zhen_jue"
+display_name = "煅真诀"
+description = "以火煅真，淬炼卡牌。启用薪火相传、离火易象等转化技能。火穴增益气运，水穴压制神识。"
+element = "火"
+qi_per_step = 1
+qi_return_rate = 0.75
+node_reactions = {
+"火": "luck_up:1",
+"水": "divine_sense_down:1",
+"木": "",
+"金": "",
+"土": ""
+}
+attack_multiplier = 0.9
+defense_multiplier = 1.0
+attack_bonus = ""
+defense_bonus = ""
+pressure_mod = 1.1

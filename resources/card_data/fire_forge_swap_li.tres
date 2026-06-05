@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/card_data.gd" id="1_card"]
+
+[resource]
+script = ExtResource("1_card")
+id = "fire_forge_swap_li"
+display_name = "离火易象"
+card_type = 2
+rarity = 3
+cost = 3
+element = "火"
+behavior = 6
+elixir_effect = "swap_li"
+play_condition = "has_technique:duan_zhen_jue"
+description = "选择两张手牌，再各选一个特性进行互换。成功率受气运和转化次数影响。"
+flavor_text = "离火易象，阴阳交变"
+tags = ["火系", "转化"]

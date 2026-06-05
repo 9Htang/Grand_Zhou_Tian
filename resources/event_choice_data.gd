@@ -21,6 +21,9 @@ extends Resource
 ## 固定触发的效果列表，格式: ["效果名:参数"]
 @export var effects: Array[String] = []
 
+## 固定结果（非随机）时展示的结果描述文字
+@export var result_text: String = ""
+
 ## 随机结果池，从 EventRandomOutcome 列表中按权重随机抽取一个触发
 @export var random_outcomes: Array = []  # Array[EventRandomOutcome]
 

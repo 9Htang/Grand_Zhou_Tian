@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/card_data.gd" id="1_card"]
+
+[resource]
+script = ExtResource("1_card")
+id = "fire_forge_pass_torch"
+display_name = "薪火相传"
+card_type = 2
+rarity = 2
+cost = 2
+element = "火"
+behavior = 6
+elixir_effect = "pass_torch"
+play_condition = "has_technique:duan_zhen_jue"
+description = "选择一张手牌作为祭品，将其随机特性转移到另一张手牌上。成功率受气运和转化次数影响。"
+flavor_text = "薪尽火传，生生不息"
+tags = ["火系", "转化"]

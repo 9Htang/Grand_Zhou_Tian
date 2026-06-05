@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="EventData" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://resources/event_data.gd" id="1_event"]
+[ext_resource type="Script" path="res://resources/event_choice_data.gd" id="2_choice"]
+
+[sub_resource type="Resource" id="sub_choice_1"]
+script = ExtResource("2_choice")
+text = "采集灵药"
+effects = Array[String](["heal:20"])
+result_text = "你小心翼翼地采集了数株灵药，药力入体，伤势恢复了不少。"
+
+[sub_resource type="Resource" id="sub_choice_2"]
+script = ExtResource("2_choice")
+text = "炼制丹药"
+requirements = "talent>=3"
+effects = Array[String](["gain_card:attack_basic", "gain_card:defense_basic"])
+result_text = "你以灵药为材，就地炼制丹药。丹成之时，药香四溢！"
+
+[resource]
+script = ExtResource("1_event")
+id = "ling_yao_yuan"
+display_name = "灵药园"
+description = "一片隐秘的灵药园出现在你面前，药香扑鼻。园中各类灵草郁郁葱葱，一看便知是上品。若能善加利用，必大有裨益。"
+choices = Array[Resource]([SubResource("sub_choice_1"), SubResource("sub_choice_2")])
